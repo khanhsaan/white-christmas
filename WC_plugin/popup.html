@@ -6,14 +6,15 @@
     <title>White Christmas Viewer</title>
     <style>
       :root {
-        --bg: #0d0d0d;
-        --panel: #151515;
-        --text: #f3f3f3;
-        --muted: #9a9a9a;
-        --line: #262626;
-        --accent: #ececec;
-        --btn: #f5f5f5;
-        --btn-text: #0f0f0f;
+        --bg: #fafafa;
+        --panel: #ffffff;
+        --text: #111111;
+        --muted: #7e7e7e;
+        --line: #e3e3e3;
+        --ink: #101010;
+        --ink-soft: #242424;
+        --btn: #111111;
+        --btn-text: #f8f8f8;
       }
 
       * {
@@ -22,115 +23,198 @@
 
       body {
         margin: 0;
-        width: 360px;
-        background: radial-gradient(circle at top right, #1e1e1e, var(--bg) 48%);
+        width: 380px;
+        min-height: 560px;
+        background:
+          linear-gradient(155deg, rgba(0, 0, 0, 0.02) 0%, transparent 36%),
+          repeating-linear-gradient(
+            90deg,
+            rgba(0, 0, 0, 0.02) 0,
+            rgba(0, 0, 0, 0.02) 1px,
+            transparent 1px,
+            transparent 8px
+          ),
+          var(--bg);
         color: var(--text);
-        font: 13px/1.5 "Avenir Next", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        font: 13px/1.55 "Syne", "Avenir Next", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
       }
 
       .wrap {
-        padding: 14px;
+        padding: 16px;
       }
 
-      .title {
-        margin: 0 0 2px;
-        font-size: 16px;
-        letter-spacing: 0.2px;
+      .topbar {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 12px;
+        margin-bottom: 12px;
+      }
+
+      .brand {
+        font-family: "Syne", "Avenir Next", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-size: 12px;
+      }
+
+      .brand-sub {
+        color: var(--muted);
+        font-family: "DM Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
+        letter-spacing: 0.12em;
+        font-size: 10px;
+        text-transform: uppercase;
       }
 
       .sub {
         margin: 0 0 14px;
         color: var(--muted);
-        font-size: 12px;
+        font-size: 11px;
+        font-family: "DM Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
+        letter-spacing: 0.04em;
       }
 
       .card {
-        background: linear-gradient(180deg, #171717, var(--panel));
+        background: linear-gradient(180deg, #fff, var(--panel));
         border: 1px solid var(--line);
-        border-radius: 12px;
-        padding: 12px;
+        border-radius: 0;
+        box-shadow: 0 16px 28px rgba(17, 17, 17, 0.06);
+        padding: 14px;
       }
 
       label {
         display: block;
-        margin-bottom: 10px;
+        margin-bottom: 11px;
       }
 
       .label {
         display: block;
         margin-bottom: 6px;
-        color: #dedede;
-        font-size: 12px;
+        color: var(--muted);
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        font-family: "DM Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
       }
 
       input[type="text"], textarea {
         width: 100%;
-        border: 1px solid #313131;
-        background: #0f0f0f;
-        color: #f5f5f5;
-        border-radius: 8px;
-        padding: 8px 10px;
+        border: 1px solid #cbcbcb;
+        background: #fff;
+        color: var(--ink);
+        border-radius: 0;
+        padding: 9px 10px;
         outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+      }
+
+      input[type="password"] {
+        width: 100%;
+        border: 1px solid #cbcbcb;
+        background: #fff;
+        color: var(--ink);
+        border-radius: 0;
+        padding: 9px 10px;
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+      }
+
+      input[type="text"]:focus, input[type="password"]:focus, textarea:focus {
+        border-color: #111;
+        box-shadow: 0 0 0 1px #111 inset;
       }
 
       textarea {
-        min-height: 72px;
+        min-height: 64px;
         resize: vertical;
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-family: "DM Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
         font-size: 12px;
       }
 
       .row {
         display: flex;
         align-items: center;
-        gap: 8px;
-        margin: 8px 0 12px;
+        gap: 10px;
+        margin: 8px 0 14px;
+      }
+
+      .row label {
+        margin: 0;
+        color: var(--ink-soft);
+        font-size: 12px;
       }
 
       .hint {
         color: var(--muted);
         margin: 0;
         font-size: 11px;
+        font-family: "DM Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
       }
 
       .actions {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin-top: 10px;
+        margin-top: 13px;
       }
 
       .actions-left {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 10px;
       }
 
       button {
-        border: 0;
-        border-radius: 999px;
-        padding: 8px 14px;
+        border: 1px solid var(--ink);
+        border-radius: 0;
+        padding: 8px 12px;
         cursor: pointer;
-        font-weight: 600;
+        font-family: "DM Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-size: 10px;
         background: var(--btn);
         color: var(--btn-text);
+        transition: transform 0.06s, opacity 0.15s;
+      }
+
+      button:hover {
+        opacity: 0.88;
+      }
+
+      button:active {
+        transform: translateY(1px);
+      }
+
+      #saveBtn {
+        background: #fff;
+        color: var(--ink);
       }
 
       #status {
-        color: #cfcfcf;
+        color: var(--ink-soft);
         font-size: 11px;
+        max-width: 130px;
+        text-align: right;
+        font-family: "DM Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
       }
 
       .divider {
         border: 0;
         border-top: 1px solid var(--line);
-        margin: 10px 0 12px;
+        margin: 11px 0 13px;
       }
     </style>
   </head>
   <body>
     <div class="wrap">
-      <h1 class="title">White Christmas Viewer</h1>
+      <div class="topbar">
+        <div class="brand">White Christmas</div>
+        <div class="brand-sub">Viewer Plugin</div>
+      </div>
       <p class="sub">Configure API access for automatic authorized decode.</p>
 
       <div class="card">
@@ -158,7 +242,7 @@
 
         <div class="row">
           <input id="autoDecode" type="checkbox" />
-          <label for="autoDecode" style="margin: 0;">Enable auto decode</label>
+          <label for="autoDecode">Enable auto decode</label>
         </div>
 
         <p class="hint">Use a logged-in user token that has decode permission from the image owner.</p>
