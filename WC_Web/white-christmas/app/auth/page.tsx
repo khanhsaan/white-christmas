@@ -167,15 +167,26 @@ export default function AuthPage() {
                 />
               </div>
 
-              <div className="auth-field">
-                <label className="auth-label" htmlFor="signup-password">Password</label>
-                <input
-                  id="signup-password"
-                  className="auth-input"
-                  type="password"
-                  placeholder="Min. 8 characters"
-                  autoComplete="new-password"
-                />
+              <div className="auth-row">
+                <div className="auth-field">
+                  <label className="auth-label" htmlFor="signup-dob">Date of birth</label>
+                  <input
+                    id="signup-dob"
+                    className="auth-input auth-input-date"
+                    type="date"
+                    autoComplete="bday"
+                  />
+                </div>
+                <div className="auth-field">
+                  <label className="auth-label" htmlFor="signup-password">Password</label>
+                  <input
+                    id="signup-password"
+                    className="auth-input"
+                    type="password"
+                    placeholder="Min. 8 characters"
+                    autoComplete="new-password"
+                  />
+                </div>
               </div>
 
               <div className="auth-divider">
