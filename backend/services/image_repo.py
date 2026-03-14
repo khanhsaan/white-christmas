@@ -26,15 +26,30 @@ def get_or_create_user_key(user_id: str) -> str:
 
 def save_image_metadata(image_id: int, owner_id: str, encrypted_subkey: str, storage_path: str) -> None:
     db = get_service_client()
-    db.table("images").upsert(
-        {
-            "image_id": image_id,
-            "owner_id": owner_id,
-            "encrypted_subkey": encrypted_subkey,
-            "storage_path": storage_path,
-        },
-        on_conflict="image_id",
-    ).execute()
+    payload = {
+        "image_id": image_id,
+        "owner_id": owner_id,
+        "encrypted_subkey": encrypted_subkey,
+        "storage_path": storage_path,
+    }
+    existing = (
+        db.table("images")
+        .select("image_id")
+        .eq("owner_id", owner_id)
+        .eq("image_id", image_id)
+        .limit(1)
+        .execute()
+    )
+    if existing.data:
+        (
+            db.table("images")
+            .update(payload)
+            .eq("owner_id", owner_id)
+            .eq("image_id", image_id)
+            .execute()
+        )
+    else:
+        db.table("images").insert(payload).execute()
 
 
 def get_image_record(image_id: int) -> Optional[dict]:
@@ -43,6 +58,7 @@ def get_image_record(image_id: int) -> Optional[dict]:
         db.table("images")
         .select("image_id, owner_id, encrypted_subkey, storage_path")
         .eq("image_id", image_id)
+        .order("created_at", desc=True)
         .limit(1)
         .execute()
     )

@@ -109,7 +109,7 @@ export default function LibraryPage() {
         {/* ── Header ─────────────────────────────────── */}
         <div className="library-header">
           <div>
-            <p className="eyebrow" style={{ color: '#3a3a3a' }}>Your protected images</p>
+            <p className="eyebrow" style={{ color: '#666' }}>Your protected images</p>
             <h2 className="library-title">
               Photo<br /><em>Library.</em>
             </h2>

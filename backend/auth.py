@@ -39,7 +39,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(
 async def get_optional_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Security(security_optional),
 ):
-    """Like get_current_user but returns None instead of 401 when no token is provided."""
+    """Like get_current_user, but allows unauthenticated requests when no token is sent."""
     if not credentials:
         return None
     try:
@@ -49,7 +49,9 @@ async def get_optional_user(
         )
         response = client.auth.get_user(credentials.credentials)
         if not response or not response.user:
-            return None
+            raise HTTPException(status_code=401, detail="Invalid token")
         return response.user
+    except HTTPException:
+        raise
     except Exception:
-        return None
+        raise HTTPException(status_code=401, detail="Invalid or expired token")

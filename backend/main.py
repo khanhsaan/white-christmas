@@ -2,6 +2,7 @@ import io
 
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv
+import os
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -25,7 +26,11 @@ from services.storage_repo import (
 )
 from services.supabase_client import get_auth_client
 
-load_dotenv()
+dotenv_path = os.path.join(os.path.dirname(__file__), ".env.local")
+if os.path.exists(dotenv_path):
+    load_dotenv(dotenv_path)
+else:
+    load_dotenv()
 
 app = FastAPI(title="White Christmas API")
 
