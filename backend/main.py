@@ -7,9 +7,15 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 from supabase import create_client
 
+from cryptography.fernet import Fernet
+
 from auth import get_current_user, security
-from db import get_or_create_user_key, save_image, get_image_owner, has_permission, grant_permission, get_user_id_by_email
-from scramble import decode_image, protect_image, key_to_seed
+from db import (
+    get_or_create_user_key, save_image, get_image_owner,
+    get_encrypted_subkey, upload_image, download_image,
+    has_permission, grant_permission, get_user_id_by_email,
+)
+from scramble import decode_image, protect_image, key_to_seed, generate_subkey
 
 load_dotenv()
 
@@ -45,6 +51,8 @@ def signup(body: AuthRequest):
         res = client.auth.sign_up({"email": body.email, "password": body.password})
         if not res.user:
             raise HTTPException(status_code=400, detail="Signup failed")
+        # Generate master key immediately on signup
+        get_or_create_user_key(str(res.user.id))
         return {
             "user_id": str(res.user.id),
             "email": res.user.email,
@@ -114,18 +122,25 @@ async def protect(
     user_id = str(user.id)
     image_bytes = await file.read()
 
-    # Get (or create) this user's Fernet key
-    fernet_key = get_or_create_user_key(user_id)
+    # Get (or create) this user's master Fernet key
+    master_key = get_or_create_user_key(user_id)
+
+    # Generate a unique subkey for this image
+    subkey = generate_subkey()
+    encrypted_subkey = Fernet(master_key.encode()).encrypt(subkey.encode()).decode()
 
     try:
-        clean_bytes, social_bytes, image_id = protect_image(image_bytes, fernet_key)
+        clean_bytes, social_bytes, image_id = protect_image(image_bytes, subkey)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    # Record image in DB
-    save_image(image_id, user_id)
+    # Save metadata + encrypted subkey to DB
+    save_image(image_id, user_id, encrypted_subkey)
+
+    # Save clean scrambled image to storage (used for decoding later)
+    upload_image(image_id, clean_bytes)
 
     output = social_bytes if version == "social" else clean_bytes
     filename = f"protected_{image_id}_{'social' if version == 'social' else 'clean'}.jpg"
@@ -143,37 +158,40 @@ async def protect(
 # ============================================================
 # Decode — descramble using the user's own Fernet key
 # ============================================================
-@app.post("/api/decode")
+@app.get("/api/decode/{image_id}")
 async def decode(
-    file: UploadFile = File(...),
-    image_id: int = Form(...),
+    image_id: int,
     user=Depends(get_current_user),
 ):
     """
-    Descramble a protected image.
-    Requires image_id to look up the owner's Fernet key.
+    Descramble a protected image by its ID.
+    Fetches the scrambled image from storage — no file upload needed.
     Viewer must be the owner OR have been granted permission.
     """
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="File must be an image")
-
     viewer_id = str(user.id)
 
-    # Look up who owns this image
     owner_id = get_image_owner(image_id)
     if owner_id is None:
         raise HTTPException(status_code=404, detail="Image not found")
 
-    # Check permission
     if viewer_id != owner_id and not has_permission(owner_id, viewer_id):
         raise HTTPException(status_code=403, detail="Access denied")
 
-    # Always use the OWNER's Fernet key to decode
-    fernet_key = get_or_create_user_key(owner_id)
-    image_bytes = await file.read()
+    # Decrypt the image's subkey using the owner's master key
+    master_key = get_or_create_user_key(owner_id)
+    encrypted_subkey = get_encrypted_subkey(image_id)
+    if encrypted_subkey is None:
+        raise HTTPException(status_code=404, detail="Image key not found")
+    subkey = Fernet(master_key.encode()).decrypt(encrypted_subkey.encode()).decode()
+
+    # Fetch scrambled image from storage
+    try:
+        image_bytes = download_image(image_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Scrambled image not found in storage")
 
     try:
-        decoded_bytes = decode_image(image_bytes, fernet_key)
+        decoded_bytes = decode_image(image_bytes, subkey)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -182,7 +200,7 @@ async def decode(
     return StreamingResponse(
         io.BytesIO(decoded_bytes),
         media_type="image/jpeg",
-        headers={"Content-Disposition": "attachment; filename=decoded.jpg"},
+        headers={"Content-Disposition": f"attachment; filename=decoded_{image_id}.jpg"},
     )
 
 
@@ -209,8 +227,12 @@ async def get_image_key(
     if viewer_id != owner_id and not has_permission(owner_id, viewer_id):
         raise HTTPException(status_code=403, detail="Access denied")
 
-    fernet_key = get_or_create_user_key(owner_id)
-    seed = key_to_seed(fernet_key)
+    master_key = get_or_create_user_key(owner_id)
+    encrypted_subkey = get_encrypted_subkey(image_id)
+    if encrypted_subkey is None:
+        raise HTTPException(status_code=404, detail="Image key not found")
+    subkey = Fernet(master_key.encode()).decrypt(encrypted_subkey.encode()).decode()
+    seed = key_to_seed(subkey)
 
     return {"seed": seed, "blocks": 32}
 
