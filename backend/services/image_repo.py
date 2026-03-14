@@ -1,4 +1,5 @@
 from cryptography.fernet import Fernet
+from typing import Optional
 
 from services.supabase_client import get_service_client
 
@@ -36,7 +37,7 @@ def save_image_metadata(image_id: int, owner_id: str, encrypted_subkey: str, sto
     ).execute()
 
 
-def get_image_record(image_id: int) -> dict | None:
+def get_image_record(image_id: int) -> Optional[dict]:
     db = get_service_client()
     result = (
         db.table("images")
@@ -74,7 +75,7 @@ def grant_permission(owner_id: str, viewer_id: str) -> None:
     ).execute()
 
 
-def get_user_id_by_email(email: str) -> str | None:
+def get_user_id_by_email(email: str) -> Optional[str]:
     """
     Look up a user's UUID by email using Supabase Admin API.
     Handles both object and dict response shapes.

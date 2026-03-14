@@ -1070,9 +1070,27 @@ footer div {
   animation: frame-breathe 3s ease-in-out infinite;
 }
 
+.result-frame--processing {
+  animation: frame-processing 1.2s ease-in-out infinite;
+}
+
 @keyframes frame-breathe {
   0%, 100% { border-color: #222; }
   50%       { border-color: #3a3a3a; }
+}
+
+@keyframes frame-processing {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
+}
+
+.panel-img--result {
+  animation: result-reveal 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes result-reveal {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .result-frame-hint {

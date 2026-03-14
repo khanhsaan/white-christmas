@@ -1,10 +1,12 @@
 import os
-from fastapi import HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi import Security
+from typing import Optional
+
+from fastapi import HTTPException, Security
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from supabase import create_client
 
-security = HTTPBearer()
+security          = HTTPBearer()
+security_optional = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)):
@@ -32,3 +34,22 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(
         raise
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+
+async def get_optional_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security_optional),
+):
+    """Like get_current_user but returns None instead of 401 when no token is provided."""
+    if not credentials:
+        return None
+    try:
+        client = create_client(
+            os.getenv("SUPABASE_URL"),
+            os.getenv("SUPABASE_ANON_KEY"),
+        )
+        response = client.auth.get_user(credentials.credentials)
+        if not response or not response.user:
+            return None
+        return response.user
+    except Exception:
+        return None

@@ -83,20 +83,19 @@ export default function EncodePage() {
     setStage('protecting')
 
     try {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-      if (sessionError || !sessionData.session?.access_token) {
-        throw new Error('Please sign in before protecting images.')
-      }
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
 
       const formData = new FormData()
       formData.append('file', selectedFile)
       formData.append('version', 'social')
 
+      const headers: Record<string, string> = {}
+      if (token) headers.Authorization = `Bearer ${token}`
+
       const res = await fetch(`${BACKEND_BASE_URL}/api/protect`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${sessionData.session.access_token}`,
-        },
+        headers,
         body: formData,
       })
 
@@ -190,7 +189,7 @@ export default function EncodePage() {
             />
             <div className="upload-icon">░ ▒ █</div>
             <p className="upload-label">Drag &amp; drop your photo</p>
-            <p className="upload-sub">or click to browse · JPG, PNG, WEBP · sign in required</p>
+            <p className="upload-sub">or click to browse · JPG, PNG, WEBP</p>
             {stage === 'failed' && errorMessage && (
               <p className="upload-error">⚠ {errorMessage}</p>
             )}
@@ -267,22 +266,38 @@ export default function EncodePage() {
               )}
             </div>
 
-            {/* RIGHT: result frame */}
+            {/* RIGHT: result frame / protected image */}
             <div className="encode-panel">
               <p className="panel-label">Protected</p>
-              <div className={`result-frame${stage === 'done' ? ' result-frame--done' : ''}`}>
-                {stage === 'done' ? (
-                  protectedImageUrl ? (
-                    <img src={protectedImageUrl} alt="Protected result" className="panel-img" />
-                  ) : (
-                    <span className="result-frame-hint">Result unavailable</span>
-                  )
+
+              {/* Placeholder while idle or processing */}
+              {stage !== 'done' && (
+                <div className={`result-frame${stage === 'protecting' ? ' result-frame--processing' : ''}`}>
+                  <span className="result-frame-hint">
+                    {stage === 'protecting' ? 'Protecting...' : '░ ▒ █'}
+                  </span>
+                </div>
+              )}
+
+              {/* Actual protected image once done */}
+              {stage === 'done' && (
+                protectedImageUrl ? (
+                  <img
+                    src={protectedImageUrl}
+                    alt="Protected result"
+                    className="panel-img panel-img--result"
+                  />
                 ) : (
-                  <span className="result-frame-hint">░ ▒ █</span>
-                )}
-              </div>
+                  <div className="result-frame">
+                    <span className="result-frame-hint">Result unavailable</span>
+                  </div>
+                )
+              )}
+
               {stage === 'done' && imageId && (
-                <p className="upload-sub">Image ID: {imageId}</p>
+                <p className="upload-sub" style={{ color: '#2a2a2a' }}>
+                  ID: {imageId}
+                </p>
               )}
             </div>
 

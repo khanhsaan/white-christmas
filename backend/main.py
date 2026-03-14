@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from auth import get_current_user
+from auth import get_current_user, get_optional_user
 from scramble import decode_image, generate_subkey, key_to_seed, protect_image
 from services.image_repo import (
     get_image_record,
@@ -115,10 +115,14 @@ def health():
 async def protect(
     file: UploadFile = File(...),
     version: str = Form("clean"),   # "clean" or "social"
-    user=Depends(get_current_user),
+    user=Depends(get_optional_user),
 ):
     """
     Protect an image by scrambling it with the user's unique Fernet key.
+
+    Authenticated users: image is saved to storage + DB for later decoding.
+    Anonymous users: image is protected with an ephemeral key and returned
+                     immediately — no storage, no decode capability.
 
     version="clean"  → no visible watermark  (use this for decoding)
     version="social" → adds visible watermark (post this on social media)
@@ -126,20 +130,31 @@ async def protect(
     Returns the scrambled image as a JPEG download.
     Header X-Image-ID contains the 24-bit image ID embedded in the watermark.
     """
+    return await _encode_impl(file=file, version=version, user=user)
+
+
+@app.post("/api/encode")
+async def encode(
+    file: UploadFile = File(...),
+    version: str = Form("clean"),   # "clean" or "social"
+    user=Depends(get_optional_user),
+):
+    """Alias of /api/protect for encode clients."""
+    return await _encode_impl(file=file, version=version, user=user)
+
+
+async def _encode_impl(
+    file: UploadFile,
+    version: str,
+    user,           # may be None for anonymous requests
+):
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
     if version not in {"clean", "social"}:
         raise HTTPException(status_code=400, detail="version must be 'clean' or 'social'")
 
-    user_id = str(user.id)
     image_bytes = await file.read()
-
-    # Get (or create) this user's master Fernet key
-    master_key = get_or_create_user_key(user_id)
-
-    # Generate a unique subkey for this image
     subkey = generate_subkey()
-    encrypted_subkey = Fernet(master_key.encode()).encrypt(subkey.encode()).decode()
 
     try:
         clean_bytes, social_bytes, image_id = protect_image(image_bytes, subkey)
@@ -148,10 +163,15 @@ async def protect(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    # Save clean scrambled image to storage + metadata in Supabase
-    storage_path = get_storage_path(image_id)
-    upload_protected_image(storage_path, clean_bytes)
-    save_image_metadata(image_id, user_id, encrypted_subkey, storage_path)
+    # Authenticated: persist image so it can be decoded later.
+    # Anonymous: skip storage — ephemeral protection only.
+    if user is not None:
+        user_id = str(user.id)
+        master_key = get_or_create_user_key(user_id)
+        encrypted_subkey = Fernet(master_key.encode()).encrypt(subkey.encode()).decode()
+        storage_path = get_storage_path(image_id)
+        upload_protected_image(storage_path, clean_bytes)
+        save_image_metadata(image_id, user_id, encrypted_subkey, storage_path)
 
     output = social_bytes if version == "social" else clean_bytes
     filename = f"protected_{image_id}_{'social' if version == 'social' else 'clean'}.jpg"
