@@ -2,75 +2,66 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import Link from 'next/link'
+import { useSupabase } from '../../hooks/useSupabase'
 
 type Stage = 'idle' | 'uploading' | 'ready' | 'protecting' | 'done' | 'failed'
 
 const BACKEND_BASE_URL =
   process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? 'http://localhost:8000'
-const UPLOAD_API_URL =
-  process.env.NEXT_PUBLIC_UPLOAD_API_URL ?? `${BACKEND_BASE_URL}/api/upload-image`
-
-const PROTECT_DURATION = 2400 // ms — placeholder until real backend is wired
 
 export default function EncodePage() {
+  const supabase = useSupabase()
   const [stage, setStage]                       = useState<Stage>('idle')
   const [dragOver, setDragOver]                 = useState(false)
-  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null)
+  const [sourceImageUrl, setSourceImageUrl]     = useState<string | null>(null)
+  const [protectedImageUrl, setProtectedImageUrl] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile]         = useState<File | null>(null)
   const [errorMessage, setErrorMessage]         = useState('')
   const [progress, setProgress]                 = useState(0)
+  const [imageId, setImageId]                   = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const rafRef       = useRef<number>(0)
 
-  // Fake progress animation (UI-only placeholder)
+  // Keep a smooth UI progress while the backend processes.
   useEffect(() => {
     if (stage !== 'protecting') return
     const start = performance.now()
     function tick(now: number) {
-      const t      = Math.min((now - start) / PROTECT_DURATION, 1)
-      const eased  = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
-      setProgress(Math.round(eased * 100))
+      const t = Math.min((now - start) / 6000, 1)
+      setProgress(Math.min(95, Math.round(t * 100)))
       if (t < 1) {
         rafRef.current = requestAnimationFrame(tick)
-      } else {
-        setStage('done')
       }
     }
     rafRef.current = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(rafRef.current)
   }, [stage])
 
-  // ── File upload ─────────────────────────────────────────
+  // Revoke object URLs on unmount.
+  useEffect(() => {
+    return () => {
+      if (sourceImageUrl) URL.revokeObjectURL(sourceImageUrl)
+      if (protectedImageUrl) URL.revokeObjectURL(protectedImageUrl)
+    }
+  }, [sourceImageUrl, protectedImageUrl])
+
+  // ── File selection ──────────────────────────────────────
   const handleFile = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) return
-    setStage('uploading')
+    cancelAnimationFrame(rafRef.current)
+    if (sourceImageUrl) URL.revokeObjectURL(sourceImageUrl)
+    if (protectedImageUrl) URL.revokeObjectURL(protectedImageUrl)
+    const localPreviewUrl = URL.createObjectURL(file)
+
+    setStage('ready')
     setErrorMessage('')
-    setUploadedImageUrl(null)
+    setImageId(null)
+    setSelectedFile(file)
+    setSourceImageUrl(localPreviewUrl)
+    setProtectedImageUrl(null)
     setProgress(0)
-
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await fetch(UPLOAD_API_URL, { method: 'POST', body: formData })
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => null)
-        throw new Error(err?.detail || 'Upload failed')
-      }
-
-      const data = await res.json() as { saved_name: string }
-      setUploadedImageUrl(`${BACKEND_BASE_URL}/uploads/${data.saved_name}`)
-      setStage('ready')
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Upload failed'
-      setErrorMessage(
-        msg === 'Failed to fetch'
-          ? 'Could not reach upload API. Is the backend running on port 8000?'
-          : msg,
-      )
-      setStage('failed')
-    }
-  }, [])
+  }, [protectedImageUrl, sourceImageUrl])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setDragOver(false)
@@ -85,15 +76,64 @@ export default function EncodePage() {
     if (file) handleFile(file)
   }, [handleFile])
 
-  function startProtect() {
+  async function startProtect() {
+    if (!selectedFile) return
+
     setProgress(0)
     setStage('protecting')
+
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error('Please sign in before protecting images.')
+      }
+
+      const formData = new FormData()
+      formData.append('file', selectedFile)
+      formData.append('version', 'social')
+
+      const res = await fetch(`${BACKEND_BASE_URL}/api/protect`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+        body: formData,
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => null)
+        throw new Error(err?.detail || 'Protect request failed')
+      }
+
+      const blob = await res.blob()
+      const resultUrl = URL.createObjectURL(blob)
+      const responseImageId = res.headers.get('X-Image-ID')
+
+      if (protectedImageUrl) URL.revokeObjectURL(protectedImageUrl)
+      setProtectedImageUrl(resultUrl)
+      setImageId(responseImageId)
+      setProgress(100)
+      setStage('done')
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Protect request failed'
+      setErrorMessage(
+        msg === 'Failed to fetch'
+          ? 'Could not reach backend. Is FastAPI running on port 8000?'
+          : msg,
+      )
+      setStage('failed')
+    }
   }
 
   function reset() {
     cancelAnimationFrame(rafRef.current)
+    if (sourceImageUrl) URL.revokeObjectURL(sourceImageUrl)
+    if (protectedImageUrl) URL.revokeObjectURL(protectedImageUrl)
     setStage('idle')
-    setUploadedImageUrl(null)
+    setSelectedFile(null)
+    setSourceImageUrl(null)
+    setProtectedImageUrl(null)
+    setImageId(null)
     setErrorMessage('')
     setProgress(0)
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -150,7 +190,7 @@ export default function EncodePage() {
             />
             <div className="upload-icon">░ ▒ █</div>
             <p className="upload-label">Drag &amp; drop your photo</p>
-            <p className="upload-sub">or click to browse · JPG, PNG, WEBP</p>
+            <p className="upload-sub">or click to browse · JPG, PNG, WEBP · sign in required</p>
             {stage === 'failed' && errorMessage && (
               <p className="upload-error">⚠ {errorMessage}</p>
             )}
@@ -174,9 +214,9 @@ export default function EncodePage() {
             {/* LEFT: source image + button */}
             <div className="encode-panel">
               <p className="panel-label">Original</p>
-              {uploadedImageUrl && (
+              {sourceImageUrl && (
                 <img
-                  src={uploadedImageUrl}
+                  src={sourceImageUrl}
                   alt="Uploaded image"
                   className="panel-img"
                 />
@@ -192,9 +232,25 @@ export default function EncodePage() {
                 </button>
               )}
               {stage === 'done' && (
-                <button className="btn-ghost-dark" onClick={reset}>
-                  Upload another
-                </button>
+                <div style={{ display: 'grid', gap: '0.75rem' }}>
+                  <button
+                    className="btn-primary"
+                    onClick={() => {
+                      if (!protectedImageUrl) return
+                      const link = document.createElement('a')
+                      link.download = imageId
+                        ? `white-christmas-protected-${imageId}.jpg`
+                        : 'white-christmas-protected.jpg'
+                      link.href = protectedImageUrl
+                      link.click()
+                    }}
+                  >
+                    Download protected image
+                  </button>
+                  <button className="btn-ghost-dark" onClick={reset}>
+                    Upload another
+                  </button>
+                </div>
               )}
             </div>
 
@@ -216,11 +272,18 @@ export default function EncodePage() {
               <p className="panel-label">Protected</p>
               <div className={`result-frame${stage === 'done' ? ' result-frame--done' : ''}`}>
                 {stage === 'done' ? (
-                  <span className="result-frame-hint">Result will appear here</span>
+                  protectedImageUrl ? (
+                    <img src={protectedImageUrl} alt="Protected result" className="panel-img" />
+                  ) : (
+                    <span className="result-frame-hint">Result unavailable</span>
+                  )
                 ) : (
                   <span className="result-frame-hint">░ ▒ █</span>
                 )}
               </div>
+              {stage === 'done' && imageId && (
+                <p className="upload-sub">Image ID: {imageId}</p>
+              )}
             </div>
 
           </div>

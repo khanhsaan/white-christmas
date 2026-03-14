@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+
+let browserSupabaseClient: SupabaseClient | null = null;
 
 function createBrowserSupabaseClient(): SupabaseClient {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -18,6 +19,13 @@ function createBrowserSupabaseClient(): SupabaseClient {
   return createClient(supabaseUrl, supabaseAnonKey);
 }
 
+export function getSupabaseClient(): SupabaseClient {
+  if (!browserSupabaseClient) {
+    browserSupabaseClient = createBrowserSupabaseClient();
+  }
+  return browserSupabaseClient;
+}
+
 export function useSupabase() {
-  return useMemo(() => createBrowserSupabaseClient(), []);
+  return getSupabaseClient();
 }

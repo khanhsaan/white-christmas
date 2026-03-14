@@ -128,6 +128,12 @@ export function useAuth() {
     return data.user ?? null;
   };
 
+  const getAccessToken = async (): Promise<string | null> => {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) return null;
+    return data.session?.access_token ?? null;
+  };
+
   return {
     loading,
     error,
@@ -136,5 +142,6 @@ export function useAuth() {
     setUpProfile,
     signOut,
     getCurrentUser,
+    getAccessToken,
   };
 }
