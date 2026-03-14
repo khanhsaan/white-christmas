@@ -3,11 +3,9 @@
 // ===============================
 
 const BLOCKS       = 32;
-const SCRAMBLE_SEED = 435681395; // SHA-256("demo-key-123") % 2^32 — must match Python
+const DEFAULT_BACKEND_BASE = "http://localhost:8000";
 const PATCH_SIZE   = 16;
 const MARKER_BYTE  = 0xAC;       // 8-bit marker: 1010 1100 — must match Python
-const SERVER_BASE  = "http://localhost:5001";
-const VIEWER_ID    = "viewer-demo"; // set this to the authenticated viewer id
 
 const VIS_BLOCK_SIZE = 8;  // px per watermark bit
 const VIS_COLS       = 8;
@@ -51,25 +49,143 @@ function generateBlockOrder(numBlocks, seed) {
   return arr;
 }
 
-// Precomputed default order for the hardcoded seed.
-// Pass a different blockOrder to descramble() for per-image SK-derived seeds.
-const DEFAULT_BLOCK_ORDER = generateBlockOrder(BLOCKS * BLOCKS, SCRAMBLE_SEED);
+function sendRuntimeMessage(message) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(message, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve(response);
+    });
+  });
+}
 
-async function fetchBlockOrder(imageId) {
+async function getSettings() {
+  const res = await sendRuntimeMessage({ type: "wc:getSettings" });
+  if (!res?.ok || !res.settings) {
+    throw new Error("Could not load extension settings");
+  }
+  return res.settings;
+}
+
+function normalizeBaseUrl(url) {
+  return (url || DEFAULT_BACKEND_BASE).replace(/\/+$/, "");
+}
+
+async function fetchSeedPayload(imageId) {
+  const settings = await getSettings();
+  if (!settings.autoDecode) return null;
+  const baseUrl = normalizeBaseUrl(settings.backendBaseUrl);
+
+  const res = await sendRuntimeMessage({
+    type: "wc:fetchJson",
+    method: "GET",
+    url: `${baseUrl}/api/images/${imageId}/key`,
+    includeAuth: true,
+    cache: "no-store",
+  });
+
+  if (!res?.ok) throw new Error(res?.error || "Key request failed");
+  if (res.status !== 200 || !Number.isInteger(res.data?.seed)) return null;
+  return { seed: res.data.seed, blocks: Number(res.data.blocks) || BLOCKS, baseUrl };
+}
+
+async function fetchProtectedImageBytes(baseUrl, imageId) {
+  const res = await sendRuntimeMessage({
+    type: "wc:fetchArrayBuffer",
+    method: "GET",
+    url: `${baseUrl}/api/images/${imageId}/file?ts=${Date.now()}`,
+    includeAuth: true,
+    cache: "no-store",
+  });
+
+  if (!res?.ok) throw new Error(res?.error || "File request failed");
+  if (res.status !== 200) return null;
+  return normalizeArrayBuffer(res.arrayBuffer) || base64ToArrayBuffer(res.base64);
+}
+
+function normalizeArrayBuffer(value) {
+  if (!value) return null;
+  if (value instanceof ArrayBuffer) return value;
+  if (ArrayBuffer.isView(value)) {
+    return value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
+  }
+  if (Array.isArray(value)) return Uint8Array.from(value).buffer;
+  if (typeof value === "object" && Array.isArray(value.data)) {
+    return Uint8Array.from(value.data).buffer;
+  }
+  return null;
+}
+
+function base64ToArrayBuffer(base64) {
+  if (!base64 || typeof base64 !== "string") return null;
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+async function decodeImageBytesToDrawable(imageBytes) {
+  const blob = new Blob([imageBytes], { type: "image/jpeg" });
   try {
-    const url = `${SERVER_BASE}/unscramble/${imageId}?viewer_id=${encodeURIComponent(VIEWER_ID)}`;
-    const resp = await fetch(url, { cache: "no-store" });
-    if (!resp.ok) throw new Error(`unscramble ${resp.status}`);
+    return await createImageBitmap(blob);
+  } catch (_) {
+    return await new Promise((resolve, reject) => {
+      const tmp = new Image();
+      const blobUrl = URL.createObjectURL(blob);
+      tmp.onload = () => {
+        URL.revokeObjectURL(blobUrl);
+        resolve(tmp);
+      };
+      tmp.onerror = () => {
+        URL.revokeObjectURL(blobUrl);
+        reject(new Error("The source image could not be decoded."));
+      };
+      tmp.src = blobUrl;
+    });
+  }
+}
 
-    const payload = await resp.json();
-    if (!Number.isInteger(payload.scramble_seed)) throw new Error("Missing scramble_seed");
+async function fetchBitmapForDetection(img) {
+  const imageUrl = img.currentSrc || img.src;
+  if (!imageUrl) return null;
+  const isLocalFile = imageUrl.startsWith("file:");
 
-    const mode = payload.mode || "unknown";
-    console.log(`[SAI] Seed mode=${mode} image=${imageId}`);
-    return generateBlockOrder(BLOCKS * BLOCKS, payload.scramble_seed);
-  } catch (err) {
-    console.warn(`[SAI] Seed fetch failed for image ${imageId}; using legacy default.`, err?.message ?? err);
-    return DEFAULT_BLOCK_ORDER;
+  // For file:// pages, avoid fetch() entirely; use the loaded element directly.
+  // This works when "Allow access to file URLs" is enabled for the extension.
+  if (isLocalFile) {
+    try {
+      return await createImageBitmap(img);
+    } catch (_) {
+      // Fall through to other strategies.
+    }
+  }
+
+  // Prefer extension-context fetch via background to avoid page CORS limitations.
+  try {
+    const res = await sendRuntimeMessage({
+      type: "wc:fetchArrayBuffer",
+      method: "GET",
+      url: imageUrl,
+      includeAuth: false,
+      cache: "no-store",
+    });
+    if (res?.ok && res.status >= 200 && res.status < 300) {
+      const bytes = normalizeArrayBuffer(res.arrayBuffer) || base64ToArrayBuffer(res.base64);
+      if (bytes) return await createImageBitmap(new Blob([bytes]));
+    }
+  } catch (_) {
+    // Fallback below.
+  }
+
+  // Fallback to page-context fetch for cases where host permissions are unavailable.
+  try {
+    const fetchResp = await fetch(imageUrl, { cache: "no-store" });
+    if (!fetchResp.ok) return null;
+    return await createImageBitmap(await fetchResp.blob());
+  } catch (_) {
+    return null;
   }
 }
 
@@ -199,36 +315,40 @@ function extractIdDct(bitmap) {
 // 6. Descramble using server-sourced clean image
 // ===============================
 
-async function descramble(img, imageId, blockOrder = DEFAULT_BLOCK_ORDER) {
-  const { naturalWidth: w, naturalHeight: h } = img;
+async function descramble(img, imageId, blockOrder, baseUrl, blocks = BLOCKS) {
+  const protectedBuffer = await fetchProtectedImageBytes(baseUrl, imageId);
+  if (!protectedBuffer) throw new Error("Could not load protected image bytes.");
+  const serverDrawable = await decodeImageBytesToDrawable(protectedBuffer);
 
-  const resp = await fetch(`${SERVER_BASE}/image/${imageId}?ts=${Date.now()}`, { cache: "no-store" });
-  if (!resp.ok) throw new Error(`Server ${resp.status} for image ${imageId}`);
-  const serverBitmap = await createImageBitmap(await resp.blob());
+  const srcW = serverDrawable.width || img.naturalWidth;
+  const srcH = serverDrawable.height || img.naturalHeight;
+  const size = Math.floor(Math.min(srcW, srcH) / blocks) * blocks;
+  if (!size) throw new Error("Image is too small for decode grid.");
 
-  // Scale server image to the element's displayed dimensions
-  const scaled    = makeCanvas(w, h);
-  scaled.getContext("2d").drawImage(serverBitmap, 0, 0, w, h);
+  // Match backend decode preprocessing: resize to square divisible by block count.
+  const scaled = makeCanvas(size, size);
+  const scaledCtx = scaled.getContext("2d");
+  scaledCtx.imageSmoothingEnabled = true;
+  scaledCtx.drawImage(serverDrawable, 0, 0, size, size);
 
-  // Use integer block sizes matching Python's (h // blocks) to avoid per-block drift.
-  // The border remainder (w % BLOCKS pixels) stays black, same as Python's np.zeros_like.
-  const out    = makeCanvas(w, h);
+  const out    = makeCanvas(size, size);
   const outCtx = out.getContext("2d");
-  const bw     = Math.floor(w / BLOCKS);
-  const bh     = Math.floor(h / BLOCKS);
+  outCtx.imageSmoothingEnabled = false;
+  const bw     = Math.floor(size / blocks);
+  const bh     = bw;
 
   for (let orig = 0; orig < blockOrder.length; orig++) {
     const scr = blockOrder[orig];
     outCtx.drawImage(
       scaled,
-      (scr  % BLOCKS) * bw, Math.floor(scr  / BLOCKS) * bh, bw, bh,
-      (orig % BLOCKS) * bw, Math.floor(orig / BLOCKS) * bh, bw, bh,
+      (scr  % blocks) * bw, Math.floor(scr  / blocks) * bh, bw, bh,
+      (orig % blocks) * bw, Math.floor(orig / blocks) * bh, bw, bh,
     );
   }
 
   const newURL = out.convertToBlob
-    ? URL.createObjectURL(await out.convertToBlob({ type: "image/jpeg", quality: 0.95 }))
-    : out.toDataURL("image/jpeg", 0.95);
+    ? URL.createObjectURL(await out.convertToBlob({ type: "image/png" }))
+    : out.toDataURL("image/png");
 
   // Revoke the old blob URL if we created it, to free memory
   if (img.src.startsWith("blob:")) URL.revokeObjectURL(img.src);
@@ -267,16 +387,17 @@ async function processImage(img) {
     if (!img.src || img.src.startsWith("data:") || img.src.startsWith("blob:")) return;
 
     // Single fetch shared by both extractors
-    const fetchResp = await fetch(img.src);
-    if (!fetchResp.ok) return;
-    const bitmap = await createImageBitmap(await fetchResp.blob());
+    const bitmap = await fetchBitmapForDetection(img);
+    if (!bitmap) return;
 
     const imageId = extractIdVisible(bitmap) ?? extractIdDct(bitmap);
     if (imageId == null) return;
 
     console.log("[SAI] ✓ Protected image detected — ID:", imageId, "src:", img.src.slice(0, 80));
-    const blockOrder = await fetchBlockOrder(imageId);
-    await descramble(img, imageId, blockOrder);
+    const seedPayload = await fetchSeedPayload(imageId);
+    if (!seedPayload) return;
+    const blockOrder = generateBlockOrder(seedPayload.blocks * seedPayload.blocks, seedPayload.seed);
+    await descramble(img, imageId, blockOrder, seedPayload.baseUrl, seedPayload.blocks);
 
   } catch (err) {
     // Silently drop load/CORS failures for non-protected images;
@@ -294,7 +415,31 @@ async function processImage(img) {
 
 console.log("[SAI] Protected Image Unscrambler loaded");
 
-document.querySelectorAll("img").forEach(processImage);
+function scanAllImages() {
+  document.querySelectorAll("img").forEach(processImage);
+}
+
+function ensureImageElementForImageDocument() {
+  const isImageDocument = document.contentType?.startsWith("image/");
+  if (!isImageDocument) return;
+  if (document.querySelector("img")) return;
+
+  const img = document.createElement("img");
+  img.src = window.location.href;
+  img.style.maxWidth = "100vw";
+  img.style.maxHeight = "100vh";
+  img.style.width = "auto";
+  img.style.height = "auto";
+  document.body.innerHTML = "";
+  document.body.style.margin = "0";
+  document.body.style.display = "grid";
+  document.body.style.placeItems = "center";
+  document.body.style.background = "#111";
+  document.body.appendChild(img);
+}
+
+ensureImageElementForImageDocument();
+scanAllImages();
 
 new MutationObserver(mutations => {
   for (const { addedNodes } of mutations) {
@@ -307,3 +452,8 @@ new MutationObserver(mutations => {
     }
   }
 }).observe(document.documentElement ?? document.body, { childList: true, subtree: true });
+
+// Some sites and local image documents populate/replace image elements after idle.
+window.addEventListener("load", scanAllImages, { once: true });
+setTimeout(scanAllImages, 300);
+setTimeout(scanAllImages, 1200);

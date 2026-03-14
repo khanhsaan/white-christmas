@@ -1,4 +1,5 @@
 import io
+import logging
 
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv
@@ -33,6 +34,7 @@ else:
     load_dotenv()
 
 app = FastAPI(title="White Christmas API")
+logger = logging.getLogger("uvicorn.error")
 
 app.add_middleware(
     CORSMiddleware,
@@ -114,6 +116,16 @@ def health():
     return {"status": "ok"}
 
 
+def _log_image_detection(endpoint: str, image_id: int, viewer_id: str, detected: bool) -> None:
+    logger.info(
+        "[detect] endpoint=%s image_id=%s viewer=%s detected=%s",
+        endpoint,
+        image_id,
+        viewer_id,
+        str(detected).lower(),
+    )
+
+
 # ============================================================
 # Protect — scramble an image using the user's Fernet key
 # ============================================================
@@ -168,6 +180,8 @@ async def _encode_impl(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    viewer_for_log = str(user.id) if user is not None else "anonymous"
+    _log_image_detection("protect", image_id, viewer_for_log, detected=True)
 
     # Authenticated: persist image so it can be decoded later.
     # Anonymous: skip storage — ephemeral protection only.
@@ -219,7 +233,9 @@ async def decode(
 
     record = get_image_record(image_id)
     if record is None:
+        _log_image_detection("decode", image_id, viewer_id, detected=False)
         raise HTTPException(status_code=404, detail="Image not found")
+    _log_image_detection("decode", image_id, viewer_id, detected=True)
     owner_id = record.get("owner_id")
     encrypted_subkey = record.get("encrypted_subkey")
     storage_path = record.get("storage_path")
@@ -269,7 +285,9 @@ async def get_image_key(
     viewer_id = str(user.id)
     record = get_image_record(image_id)
     if record is None:
+        _log_image_detection("key", image_id, viewer_id, detected=False)
         raise HTTPException(status_code=404, detail="Image not found")
+    _log_image_detection("key", image_id, viewer_id, detected=True)
     owner_id = record.get("owner_id")
     encrypted_subkey = record.get("encrypted_subkey")
     if not owner_id or not encrypted_subkey:
@@ -298,7 +316,9 @@ async def get_scrambled_image_file(
     viewer_id = str(user.id)
     record = get_image_record(image_id)
     if record is None:
+        _log_image_detection("file", image_id, viewer_id, detected=False)
         raise HTTPException(status_code=404, detail="Image not found")
+    _log_image_detection("file", image_id, viewer_id, detected=True)
 
     owner_id = record.get("owner_id")
     storage_path = record.get("storage_path")

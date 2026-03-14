@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>White Christmas Viewer</title>
+    <style>
+      :root {
+        --bg: #0d0d0d;
+        --panel: #151515;
+        --text: #f3f3f3;
+        --muted: #9a9a9a;
+        --line: #262626;
+        --accent: #ececec;
+        --btn: #f5f5f5;
+        --btn-text: #0f0f0f;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        width: 360px;
+        background: radial-gradient(circle at top right, #1e1e1e, var(--bg) 48%);
+        color: var(--text);
+        font: 13px/1.5 "Avenir Next", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      }
+
+      .wrap {
+        padding: 14px;
+      }
+
+      .title {
+        margin: 0 0 2px;
+        font-size: 16px;
+        letter-spacing: 0.2px;
+      }
+
+      .sub {
+        margin: 0 0 14px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .card {
+        background: linear-gradient(180deg, #171717, var(--panel));
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 10px;
+      }
+
+      .label {
+        display: block;
+        margin-bottom: 6px;
+        color: #dedede;
+        font-size: 12px;
+      }
+
+      input[type="text"], textarea {
+        width: 100%;
+        border: 1px solid #313131;
+        background: #0f0f0f;
+        color: #f5f5f5;
+        border-radius: 8px;
+        padding: 8px 10px;
+        outline: none;
+      }
+
+      textarea {
+        min-height: 72px;
+        resize: vertical;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+      }
+
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 8px 0 12px;
+      }
+
+      .hint {
+        color: var(--muted);
+        margin: 0;
+        font-size: 11px;
+      }
+
+      .actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 10px;
+      }
+
+      .actions-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 8px 14px;
+        cursor: pointer;
+        font-weight: 600;
+        background: var(--btn);
+        color: var(--btn-text);
+      }
+
+      #status {
+        color: #cfcfcf;
+        font-size: 11px;
+      }
+
+      .divider {
+        border: 0;
+        border-top: 1px solid var(--line);
+        margin: 10px 0 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1 class="title">White Christmas Viewer</h1>
+      <p class="sub">Configure API access for automatic authorized decode.</p>
+
+      <div class="card">
+        <label>
+          <span class="label">Backend Base URL</span>
+          <input id="backendBaseUrl" type="text" placeholder="http://localhost:8000" />
+        </label>
+
+        <label>
+          <span class="label">Access Token (Bearer)</span>
+          <textarea id="accessToken" placeholder="Paste your Supabase access token"></textarea>
+        </label>
+
+        <hr class="divider" />
+
+        <label>
+          <span class="label">Email</span>
+          <input id="email" type="text" placeholder="you@example.com" />
+        </label>
+
+        <label>
+          <span class="label">Password</span>
+          <input id="password" type="password" placeholder="Your password" />
+        </label>
+
+        <div class="row">
+          <input id="autoDecode" type="checkbox" />
+          <label for="autoDecode" style="margin: 0;">Enable auto decode</label>
+        </div>
+
+        <p class="hint">Use a logged-in user token that has decode permission from the image owner.</p>
+
+        <div class="actions">
+          <div class="actions-left">
+            <button id="signInBtn">Sign In</button>
+            <button id="saveBtn">Save Settings</button>
+          </div>
+          <span id="status"></span>
+        </div>
+      </div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+  </html>
