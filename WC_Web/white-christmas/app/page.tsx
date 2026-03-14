@@ -1,65 +1,173 @@
-import Image from "next/image";
+import PixelPortrait from './components/PixelPortrait'
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <>
+      {/* ── NAV ─────────────────────────────────────────── */}
+      <nav>
+        <a className="logo" href="#">White Christmas</a>
+        <ul>
+          <li><a href="#how">How it works</a></li>
+          <li><a href="#access">Access tiers</a></li>
+          <li><a href="#" className="nav-cta">Get access</a></li>
+        </ul>
+      </nav>
+
+      {/* ── HERO ────────────────────────────────────────── */}
+      <section className="hero">
+        <div className="hero-left">
+          <p className="eyebrow">Selective vision technology</p>
+          <h1>
+            Only trusted eyes<br />
+            <em>see you clearly.</em>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="hero-sub">
+            White Christmas encrypts your images at the pixel level.<br />
+            Strangers see noise. The people you choose see you.
           </p>
+          <div className="hero-actions">
+            <a href="#" className="btn-primary">Encode your first photo</a>
+            <a href="#how" className="btn-ghost">See how it works</a>
+          </div>
+          <div className="hero-stats">
+            <div>
+              <span className="stat-num">256×</span>
+              <span className="stat-label">Pixel-layer encryption</span>
+            </div>
+            <div>
+              <span className="stat-num">∞</span>
+              <span className="stat-label">Permission tiers</span>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <div className="hero-right">
+          <PixelPortrait />
+          <div className="decode-badge">Encoded · Decode with permission</div>
         </div>
-      </main>
-    </div>
-  );
+      </section>
+
+      <hr />
+
+      {/* ── HOW IT WORKS ────────────────────────────────── */}
+      <section className="how" id="how">
+        <div className="section-label">How it works</div>
+        <div className="steps">
+          <div className="step">
+            <span className="step-num">01</span>
+            <div>
+              <h3 className="step-title">Upload your photo</h3>
+              <p className="step-desc">
+                Your image is fragmented into pixel blocks and re-encoded with a
+                cryptographic key tied to your account. The original is never stored.
+              </p>
+            </div>
+          </div>
+          <div className="step">
+            <span className="step-num">02</span>
+            <div>
+              <h3 className="step-title">Share the encoded version</h3>
+              <p className="step-desc">
+                The pixelated image is safe to post anywhere. To the uninvited,
+                it&apos;s visual static — a face dissolving into abstraction.
+              </p>
+            </div>
+          </div>
+          <div className="step">
+            <span className="step-num">03</span>
+            <div>
+              <h3 className="step-title">Grant decode access</h3>
+              <p className="step-desc">
+                You decide who has the plugin and who has the permission. Close
+                friends, family, colleagues — each with their own tier of visibility.
+              </p>
+            </div>
+          </div>
+          <div className="step">
+            <span className="step-num">04</span>
+            <div>
+              <h3 className="step-title">They see you. Others don&apos;t.</h3>
+              <p className="step-desc">
+                Permitted viewers install the White Christmas browser plugin. For
+                them, your image decodes instantly — seamless and automatic.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <hr />
+
+      {/* ── PERMISSIONS ─────────────────────────────────── */}
+      <section className="permissions" id="access">
+        <div className="permissions-inner">
+          <h2>
+            You control<br />
+            <em>every layer</em><br />
+            of visibility.
+          </h2>
+          <p className="permissions-sub">
+            Granular permission tiers let you decide exactly how much of yourself
+            each person is allowed to see.
+          </p>
+          <div className="tiers">
+            <div className="tier">
+              <span className="tier-icon">░ ░ ░ ░</span>
+              <p className="tier-name">Public</p>
+              <p className="tier-desc">
+                Pixelated abstraction. Visual noise. Unreadable to anyone without
+                access.
+              </p>
+            </div>
+            <div className="tier">
+              <span className="tier-icon">▒ ▒ ░ ░</span>
+              <p className="tier-name">Known</p>
+              <p className="tier-desc">
+                Partial decode. Outline and presence — but not full identity.
+              </p>
+            </div>
+            <div className="tier">
+              <span className="tier-icon">█ █ █ █</span>
+              <p className="tier-name">Trusted</p>
+              <p className="tier-desc">
+                Full decode. Crystal clear. Every pixel restored for the people
+                who matter.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── QUOTE ───────────────────────────────────────── */}
+      <section className="quote-section">
+        <blockquote>
+          &ldquo;I just want to unsee<br />
+          the things I&apos;ve seen.&rdquo;
+        </blockquote>
+        <cite>— White Christmas · Black Mirror S02E04</cite>
+      </section>
+
+      {/* ── CTA ─────────────────────────────────────────── */}
+      <section className="cta-section">
+        <div className="cta-text">
+          <h3>Start encoding today.</h3>
+          <p>Free to try. No credit card required.</p>
+        </div>
+        <a href="#" className="btn-primary">
+          Create your first encoded image →
+        </a>
+      </section>
+
+      {/* ── FOOTER ──────────────────────────────────────── */}
+      <footer>
+        <p>© 2026 White Christmas · All rights reserved</p>
+        <div>
+          <a href="#">Privacy</a>
+          <a href="#">Terms</a>
+          <a href="#">Plugin</a>
+          <a href="#">Contact</a>
+        </div>
+      </footer>
+    </>
+  )
 }
