@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import PixelPortrait from './components/PixelPortrait'
 
 export default function Home() {
@@ -26,7 +27,7 @@ export default function Home() {
             Strangers see noise. The people you choose see you.
           </p>
           <div className="hero-actions">
-            <a href="#" className="btn-primary">Encode your first photo</a>
+            <Link href="/encode" className="btn-primary">Encode your first photo</Link>
             <a href="#how" className="btn-ghost">See how it works</a>
           </div>
           <div className="hero-stats">
@@ -153,9 +154,9 @@ export default function Home() {
           <h3>Start encoding today.</h3>
           <p>Free to try. No credit card required.</p>
         </div>
-        <a href="#" className="btn-primary">
+        <Link href="/encode" className="btn-primary">
           Create your first encoded image →
-        </a>
+        </Link>
       </section>
 
       {/* ── FOOTER ──────────────────────────────────────── */}
