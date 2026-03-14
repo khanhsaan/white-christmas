@@ -1,1 +1,1 @@
-select * from public.profiles;
+select * from auth.users;

@@ -231,6 +231,19 @@ def create_or_accept_friend_request(requester_id: str, addressee_id: str) -> dic
     return {"status": "pending", "auto_accepted": False}
 
 
+def decline_friend_request(addressee_id: str, requester_id: str) -> bool:
+    db = get_service_client()
+    result = (
+        db.table("friendships")
+        .delete()
+        .eq("requester_id", requester_id)
+        .eq("addressee_id", addressee_id)
+        .eq("status", "pending")
+        .execute()
+    )
+    return len(result.data) > 0
+
+
 def accept_friend_request(addressee_id: str, requester_id: str) -> bool:
     db = get_service_client()
     existing = (

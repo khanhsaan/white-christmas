@@ -43,6 +43,7 @@ export default function LibraryPage() {
   const [friendEmail, setFriendEmail] = useState('')
   const [friendStatus, setFriendStatus] = useState('')
   const [refreshTick, setRefreshTick] = useState(0)
+  const [showNotifications, setShowNotifications] = useState(false)
 
   const updateEntry = useCallback(
     (image_id: number, patch: Partial<ImageEntry>) =>
@@ -229,6 +230,28 @@ export default function LibraryPage() {
     }
   }
 
+  async function declineRequest(requesterId: string) {
+    if (!accessToken) return
+    try {
+      const res = await fetch(`${BACKEND_BASE_URL}/api/friends/decline`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ requester_id: requesterId }),
+      })
+      const json = await res.json().catch(() => null)
+      if (!res.ok) {
+        setFriendStatus(json?.detail || 'Decline failed.')
+        return
+      }
+      refreshData()
+    } catch {
+      setFriendStatus('Could not reach backend.')
+    }
+  }
+
   async function signOut() {
     await supabase.auth.signOut()
     router.push('/auth')
@@ -244,6 +267,8 @@ export default function LibraryPage() {
     link.click()
   }
 
+  const pendingRequests = friends.filter(f => f.direction === 'incoming' && f.status === 'pending')
+
   return (
     <>
       <nav>
@@ -251,6 +276,52 @@ export default function LibraryPage() {
         <ul>
           <li><Link href="/#how">How it works</Link></li>
           <li><Link href="/encode">Encode image</Link></li>
+          {accessToken && (
+            <li className="nav-notif-wrap">
+              <button
+                className="nav-notif-btn"
+                onClick={() => setShowNotifications(v => !v)}
+                aria-label={`Friend requests${pendingRequests.length > 0 ? ` (${pendingRequests.length})` : ''}`}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+                {pendingRequests.length > 0 && (
+                  <span className="nav-notif-badge">{pendingRequests.length}</span>
+                )}
+              </button>
+
+              {showNotifications && (
+                <div className="nav-notif-dropdown">
+                  <p className="nav-notif-heading">Friend Requests</p>
+                  {pendingRequests.length === 0 ? (
+                    <p className="nav-notif-empty">No pending requests</p>
+                  ) : (
+                    pendingRequests.map(req => (
+                      <div key={req.friend_id} className="nav-notif-row">
+                        <span className="nav-notif-email">{req.friend_email || req.friend_id}</span>
+                        <div className="nav-notif-actions">
+                          <button
+                            className="nav-notif-accept"
+                            onClick={() => { acceptRequest(req.friend_id); setShowNotifications(false) }}
+                          >
+                            Accept
+                          </button>
+                          <button
+                            className="nav-notif-decline"
+                            onClick={() => { declineRequest(req.friend_id); setShowNotifications(false) }}
+                          >
+                            Decline
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </li>
+          )}
           {!accessToken ? (
             <li><Link href="/auth" className="nav-cta">Sign in</Link></li>
           ) : (

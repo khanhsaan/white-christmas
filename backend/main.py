@@ -14,6 +14,7 @@ from scramble import decode_image, generate_subkey, key_to_seed, protect_image
 from services.image_repo import (
     accept_friend_request,
     create_or_accept_friend_request,
+    decline_friend_request,
     get_image_record,
     get_images_shared_with_user,
     get_or_create_user_key,
@@ -430,6 +431,23 @@ async def accept_friend(
     grant_permission(addressee_id, requester_id)
     grant_permission(requester_id, addressee_id)
     return {"status": "accepted", "requester_id": requester_id}
+
+
+@app.post("/api/friends/decline")
+async def decline_friend(
+    body: FriendAcceptBody,
+    user=Depends(get_current_user),
+):
+    addressee_id = str(user.id)
+    requester_id = body.requester_id
+    if requester_id == addressee_id:
+        raise HTTPException(status_code=400, detail="Invalid requester_id")
+
+    declined = decline_friend_request(addressee_id=addressee_id, requester_id=requester_id)
+    if not declined:
+        raise HTTPException(status_code=404, detail="No pending friend request found")
+
+    return {"status": "declined", "requester_id": requester_id}
 
 
 @app.get("/api/friends")
