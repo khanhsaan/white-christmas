@@ -34,10 +34,21 @@ def get_or_create_user_key(user_id: str) -> str:
     return key
 
 
-def save_image(image_id: int, owner_id: str) -> None:
-    """Record a protected image in the DB."""
+def save_image(image_id: int, owner_id: str, encrypted_subkey: str) -> None:
+    """Record a protected image with its encrypted subkey in the DB."""
     db = get_db()
-    db.table("images").upsert({"image_id": image_id, "owner_id": owner_id}).execute()
+    db.table("images").upsert({
+        "image_id": image_id,
+        "owner_id": owner_id,
+        "encrypted_subkey": encrypted_subkey,
+    }).execute()
+
+
+def get_encrypted_subkey(image_id: int) -> str | None:
+    """Return the encrypted subkey for an image, or None if not found."""
+    db = get_db()
+    result = db.table("images").select("encrypted_subkey").eq("image_id", image_id).execute()
+    return result.data[0]["encrypted_subkey"] if result.data else None
 
 
 def get_image_owner(image_id: int) -> str | None:
@@ -58,6 +69,24 @@ def has_permission(owner_id: str, viewer_id: str) -> bool:
         .execute()
     )
     return len(result.data) > 0
+
+
+def upload_image(image_id: int, image_bytes: bytes) -> None:
+    """Upload the clean scrambled image to Supabase Storage."""
+    db = get_db()
+    path = f"{image_id}.jpg"
+    db.storage.from_("protected-images").upload(
+        path,
+        image_bytes,
+        {"content-type": "image/jpeg", "upsert": "true"},
+    )
+
+
+def download_image(image_id: int) -> bytes:
+    """Download the clean scrambled image from Supabase Storage."""
+    db = get_db()
+    path = f"{image_id}.jpg"
+    return db.storage.from_("protected-images").download(path)
 
 
 def get_user_id_by_email(email: str) -> str | None:

@@ -6,6 +6,7 @@ Ported from the white-christmas_template main.py.
 import cv2
 import numpy as np
 import hashlib
+from cryptography.fernet import Fernet
 from typing import Tuple
 
 PATCH_SIZE = 16
@@ -27,6 +28,11 @@ def mulberry32(seed: int):
         t &= 0xFFFFFFFF
         return ((t ^ (t >> 14)) & 0xFFFFFFFF) / 4294967296.0
     return rng
+
+
+def generate_subkey() -> str:
+    """Generate a new random Fernet key to use as an image subkey."""
+    return Fernet.generate_key().decode()
 
 
 def key_to_seed(key: str) -> int:
@@ -226,7 +232,7 @@ def descramble_image(img: np.ndarray, blocks: int, order: list) -> np.ndarray:
 
 def decode_image(
     image_bytes: bytes,
-    user_key: str,
+    subkey: str,
     blocks: int = 32,
 ) -> bytes:
     """
@@ -246,7 +252,7 @@ def decode_image(
     size = (size // blocks) * blocks
     img = cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA)
 
-    order = generate_block_order(blocks, user_key)
+    order = generate_block_order(blocks, subkey)
     decoded = descramble_image(img, blocks, order)
 
     success, buf = cv2.imencode(".jpg", decoded, [cv2.IMWRITE_JPEG_QUALITY, 95])
@@ -261,24 +267,24 @@ def decode_image(
 # ============================================================
 def protect_image(
     image_bytes: bytes,
-    user_key: str,
+    subkey: str,
     blocks: int = 32,
     size: int = 512,
 ) -> Tuple[bytes, bytes, int]:
     """
-    Scramble an image with the given key.
+    Scramble an image with the given subkey.
 
     Returns:
         (clean_jpeg_bytes, social_jpeg_bytes, image_id_24)
 
-        clean_jpeg_bytes  — no watermark, use this for decoding
-        social_jpeg_bytes — has visible watermark, post this to social media
+        clean_jpeg_bytes  — no visible watermark, stored in DB for decoding
+        social_jpeg_bytes — has visible watermark, returned to user to post on social media
     """
     img = load_and_resize(image_bytes, size=size)
 
     image_id_24 = compute_image_id_24(img)
 
-    order = generate_block_order(blocks, user_key)
+    order = generate_block_order(blocks, subkey)
     scrambled = scramble_image(img, blocks, order)
 
     # Clean version: only invisible DCT watermark (safe to decode from)
