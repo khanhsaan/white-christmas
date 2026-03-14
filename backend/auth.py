@@ -1,0 +1,34 @@
+import os
+from fastapi import HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Security
+from supabase import create_client
+
+security = HTTPBearer()
+
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)):
+    """
+    FastAPI dependency — verifies the Supabase JWT from the Authorization header.
+    Works with Swagger's Authorize button (no manual header field needed).
+
+    Usage:
+        @app.post("/api/protect")
+        async def protect(user=Depends(get_current_user)):
+            user_id = str(user.id)
+    """
+    token = credentials.credentials
+
+    try:
+        client = create_client(
+            os.getenv("SUPABASE_URL"),
+            os.getenv("SUPABASE_ANON_KEY"),
+        )
+        response = client.auth.get_user(token)
+        if not response or not response.user:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return response.user
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
