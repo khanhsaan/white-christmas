@@ -58,10 +58,10 @@ export default function LibraryPage() {
       setPageState('loaded')
       setImages(imageList.map(img => ({ ...img, blobUrl: null, status: 'loading' })))
 
-      // ── Decode each image in parallel ────────────────
+      // ── Fetch each encoded image in parallel ─────────
       imageList.forEach(async ({ image_id }) => {
         try {
-          const res = await fetch(`${BACKEND_BASE_URL}/api/decode/${image_id}`, {
+          const res = await fetch(`${BACKEND_BASE_URL}/api/images/${image_id}/file`, {
             headers: { Authorization: `Bearer ${token}` },
           })
           if (cancelled) return
@@ -87,7 +87,7 @@ export default function LibraryPage() {
     if (!entry.blobUrl) return
     const link      = document.createElement('a')
     link.href       = entry.blobUrl
-    link.download   = `white-christmas-${entry.image_id}.jpg`
+    link.download   = `white-christmas-protected-${entry.image_id}.jpg`
     link.click()
   }
 
@@ -166,13 +166,13 @@ export default function LibraryPage() {
                 )}
                 {entry.status === 'error' && (
                   <div className="library-card-media library-card-media--error">
-                    <span>⚠ Decode failed</span>
+                    <span>⚠ Load failed</span>
                   </div>
                 )}
                 {entry.status === 'ready' && entry.blobUrl && (
                   <img
                     src={entry.blobUrl}
-                    alt={`Protected image #${entry.image_id}`}
+                    alt={`Encoded image #${entry.image_id}`}
                     className="library-card-media library-card-img"
                   />
                 )}
@@ -184,7 +184,7 @@ export default function LibraryPage() {
                     className="library-card-action"
                     disabled={entry.status !== 'ready'}
                     onClick={() => download(entry)}
-                    title="Download decoded image"
+                    title="Download encoded image"
                   >
                     ↓ Download
                   </button>
