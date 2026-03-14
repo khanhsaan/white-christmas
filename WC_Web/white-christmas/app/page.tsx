@@ -10,7 +10,8 @@ export default function Home() {
         <ul>
           <li><a href="#how">How it works</a></li>
           <li><a href="#access">Access tiers</a></li>
-          <li><a href="#" className="nav-cta">Get access</a></li>
+          <li><Link href="/auth">Sign in</Link></li>
+          <li><Link href="/auth" className="nav-cta">Get access</Link></li>
         </ul>
       </nav>
 
