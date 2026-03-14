@@ -14,6 +14,10 @@ const STATUS_STEPS: { at: number; text: string }[] = [
 ]
 
 const ENCODE_DURATION = 3800
+const BACKEND_BASE_URL =
+  process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? 'http://localhost:8000'
+const UPLOAD_API_URL =
+  process.env.NEXT_PUBLIC_UPLOAD_API_URL ?? `${BACKEND_BASE_URL}/api/upload-image`
 
 export default function EncodePage() {
   const [stage, setStage]           = useState<Stage>('idle')
@@ -21,12 +25,49 @@ export default function EncodePage() {
   const [progress, setProgress]     = useState(0)
   const [statusText, setStatusText] = useState(STATUS_STEPS[0].text)
   const [blockCount, setBlockCount] = useState(0)
+  const [uploadState, setUploadState] = useState<'idle' | 'uploading' | 'uploaded' | 'failed'>('idle')
+  const [uploadMessage, setUploadMessage] = useState('')
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null)
 
   const canvasRef      = useRef<HTMLCanvasElement>(null)
   const fileInputRef   = useRef<HTMLInputElement>(null)
   const rafRef         = useRef<number>(0)
   const scrambledRef   = useRef<HTMLCanvasElement | null>(null)
   const imgRef         = useRef<HTMLImageElement | null>(null)
+  const encodingStartedRef = useRef(false)
+
+  const uploadImage = useCallback(async (file: File) => {
+    setUploadState('uploading')
+    setUploadMessage('')
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const res = await fetch(UPLOAD_API_URL, {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => null)
+        throw new Error(err?.detail || 'Upload failed')
+      }
+
+      const data = await res.json() as { saved_name: string }
+      setUploadedImageUrl(`${BACKEND_BASE_URL}/uploads/${data.saved_name}`)
+      setUploadState('uploaded')
+      setUploadMessage('')
+    } catch (error) {
+      setUploadState('failed')
+      const errorMessage = error instanceof Error ? error.message : 'Upload failed'
+      setUploadMessage(
+        errorMessage === 'Failed to fetch'
+          ? 'Could not reach upload API. Start backend on port 8000.'
+          : errorMessage,
+      )
+    }
+  }, [])
 
   // ── Cleanup on unmount ─────────────────────────────────
   useEffect(() => () => cancelAnimationFrame(rafRef.current), [])
@@ -144,13 +185,15 @@ export default function EncodePage() {
   }
 
   // ── Start encoding ─────────────────────────────────────
-  function startEncoding(img: HTMLImageElement) {
-    setStage('processing')
+  const startEncoding = useCallback((img: HTMLImageElement) => {
     setProgress(0)
     setStatusText(STATUS_STEPS[0].text)
 
-    const canvas = canvasRef.current!
-    const ctx    = canvas.getContext('2d')!
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const context = ctx
 
     const MAX_W  = 720
     const scale  = Math.min(1, MAX_W / img.width)
@@ -184,50 +227,63 @@ export default function EncodePage() {
       if (step) setStatusText(step.text)
 
       // Compose frame
-      ctx.clearRect(0, 0, W, H)
+      context.clearRect(0, 0, W, H)
 
       // Scrambled base
-      ctx.drawImage(scrambled, 0, 0)
+      context.drawImage(scrambled, 0, 0)
 
       // Original image only to the right of the scan line
       if (scanX < W) {
-        ctx.save()
-        ctx.beginPath()
-        ctx.rect(scanX, 0, W - scanX, H)
-        ctx.clip()
-        ctx.drawImage(img, 0, 0, W, H)
-        ctx.restore()
+        context.save()
+        context.beginPath()
+        context.rect(scanX, 0, W - scanX, H)
+        context.clip()
+        context.drawImage(img, 0, 0, W, H)
+        context.restore()
       }
 
       // Scan line glow
-      if (scanX > 0 && scanX < W) drawScanLine(ctx, scanX, H)
+      if (scanX > 0 && scanX < W) drawScanLine(context, scanX, H)
 
       if (t < 1) {
         rafRef.current = requestAnimationFrame(tick)
       } else {
         // Brief white flash at seal moment
-        ctx.fillStyle = 'rgba(255,255,255,0.12)'
-        ctx.fillRect(0, 0, W, H)
+        context.fillStyle = 'rgba(255,255,255,0.12)'
+        context.fillRect(0, 0, W, H)
         setTimeout(() => setStage('done'), 200)
       }
     }
 
     rafRef.current = requestAnimationFrame(tick)
-  }
+  }, [])
+
+  useEffect(() => {
+    if (stage !== 'processing') return
+    if (encodingStartedRef.current) return
+    if (!imgRef.current) return
+    if (!canvasRef.current) return
+
+    encodingStartedRef.current = true
+    startEncoding(imgRef.current)
+  }, [stage, startEncoding])
 
   // ── File handling ──────────────────────────────────────
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) return
+    cancelAnimationFrame(rafRef.current)
+    encodingStartedRef.current = false
+    void uploadImage(file)
     const url = URL.createObjectURL(file)
     const img  = new Image()
     img.onload = () => {
       imgRef.current = img
       URL.revokeObjectURL(url)
-      startEncoding(img)
+      setStage('processing')  // ← only after image is fully loaded
     }
     img.src = url
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [uploadImage])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -254,9 +310,13 @@ export default function EncodePage() {
 
   function reset() {
     cancelAnimationFrame(rafRef.current)
+    encodingStartedRef.current = false
     setStage('idle')
     setProgress(0)
     setBlockCount(0)
+    setUploadState('idle')
+    setUploadMessage('')
+    setUploadedImageUrl(null)
     scrambledRef.current = null
     imgRef.current       = null
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -334,6 +394,18 @@ export default function EncodePage() {
           </div>
         )}
 
+        {/* ── DONE: original image from backend ──────── */}
+        {stage === 'done' && uploadedImageUrl && (
+          <div className="upload-result">
+            <p className="upload-result-label">↑ encoded · original ↓</p>
+            <img
+              src={uploadedImageUrl}
+              alt="Original uploaded image"
+              className="upload-result-img"
+            />
+          </div>
+        )}
+
         {/* ── PROCESSING: progress ──────────────────── */}
         {stage === 'processing' && (
           <div className="encode-status">
@@ -342,6 +414,9 @@ export default function EncodePage() {
               <div className="progress-fill" style={{ width: `${progress}%` }} />
             </div>
             <p className="progress-num">{progress}%</p>
+            {uploadState === 'uploading' && (
+              <p className="upload-sub">Uploading original image to backend...</p>
+            )}
           </div>
         )}
 
@@ -367,6 +442,11 @@ export default function EncodePage() {
               Share this encoded image anywhere — social media, messages, anywhere.<br />
               Strangers see only noise. The people you permit see you clearly.
             </p>
+            {uploadState === 'failed' && uploadMessage && (
+              <p className="upload-sub" style={{ marginBottom: '1rem', color: '#ff8f8f' }}>
+                ⚠ {uploadMessage}
+              </p>
+            )}
 
             <div className="done-actions">
               <button className="btn-primary" onClick={downloadEncoded}>

@@ -2,11 +2,31 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/hooks/useAuth'
 
 type Tab = 'signin' | 'signup'
 
 export default function AuthPage() {
+  const router = useRouter()
+  const { signIn, loading, error } = useAuth()
+
   const [tab, setTab] = useState<Tab>('signin')
+
+  // ── Sign-in state ──────────────────────────────────────
+  const [siEmail, setSiEmail]       = useState('')
+  const [siPassword, setSiPassword] = useState('')
+
+  // ── Handlers ───────────────────────────────────────────
+  async function handleSignIn(e: React.FormEvent) {
+    e.preventDefault()
+    const { error } = await signIn({ email: siEmail, password: siPassword })
+    if (!error) router.push('/')
+  }
+
+  function switchTab(next: Tab) {
+    setTab(next)
+  }
 
   return (
     <>
@@ -69,7 +89,7 @@ export default function AuthPage() {
               aria-selected={tab === 'signin'}
               className={`auth-tab${tab === 'signin' ? ' active' : ''}`}
               type="button"
-              onClick={() => setTab('signin')}
+              onClick={() => switchTab('signin')}
             >
               Sign in
             </button>
@@ -78,15 +98,20 @@ export default function AuthPage() {
               aria-selected={tab === 'signup'}
               className={`auth-tab${tab === 'signup' ? ' active' : ''}`}
               type="button"
-              onClick={() => setTab('signup')}
+              onClick={() => switchTab('signup')}
             >
               Create account
             </button>
           </div>
 
+          {/* Shared error banner */}
+          {error && (
+            <p className="auth-error">{error}</p>
+          )}
+
           {/* ── SIGN IN FORM ──────────────────────────── */}
           {tab === 'signin' && (
-            <form className="auth-form" onSubmit={e => e.preventDefault()}>
+            <form className="auth-form" onSubmit={handleSignIn}>
               <div className="auth-field">
                 <label className="auth-label" htmlFor="signin-email">Email address</label>
                 <input
@@ -95,6 +120,9 @@ export default function AuthPage() {
                   type="email"
                   placeholder="you@example.com"
                   autoComplete="email"
+                  required
+                  value={siEmail}
+                  onChange={e => setSiEmail(e.target.value)}
                 />
               </div>
 
@@ -106,6 +134,9 @@ export default function AuthPage() {
                   type="password"
                   placeholder="••••••••"
                   autoComplete="current-password"
+                  required
+                  value={siPassword}
+                  onChange={e => setSiPassword(e.target.value)}
                 />
               </div>
 
@@ -113,16 +144,13 @@ export default function AuthPage() {
                 <a href="#" className="auth-link">Forgot password?</a>
               </div>
 
-              <button className="auth-submit" type="button">
-                Sign in →
+              <button className="auth-submit" type="submit" disabled={loading}>
+                {loading ? 'Signing in…' : 'Sign in →'}
               </button>
 
               <p className="auth-fine-print">
                 Don&apos;t have an account?{' '}
-                <a
-                  href="#"
-                  onClick={e => { e.preventDefault(); setTab('signup') }}
-                >
+                <a href="#" onClick={e => { e.preventDefault(); switchTab('signup') }}>
                   Create one
                 </a>
                 .
@@ -133,29 +161,6 @@ export default function AuthPage() {
           {/* ── SIGN UP FORM ──────────────────────────── */}
           {tab === 'signup' && (
             <form className="auth-form" onSubmit={e => e.preventDefault()}>
-              <div className="auth-row">
-                <div className="auth-field">
-                  <label className="auth-label" htmlFor="signup-first">First name</label>
-                  <input
-                    id="signup-first"
-                    className="auth-input"
-                    type="text"
-                    placeholder="Jane"
-                    autoComplete="given-name"
-                  />
-                </div>
-                <div className="auth-field">
-                  <label className="auth-label" htmlFor="signup-last">Last name</label>
-                  <input
-                    id="signup-last"
-                    className="auth-input"
-                    type="text"
-                    placeholder="Doe"
-                    autoComplete="family-name"
-                  />
-                </div>
-              </div>
-
               <div className="auth-field">
                 <label className="auth-label" htmlFor="signup-email">Email address</label>
                 <input
@@ -167,45 +172,31 @@ export default function AuthPage() {
                 />
               </div>
 
-              <div className="auth-row">
-                <div className="auth-field">
-                  <label className="auth-label" htmlFor="signup-dob">Date of birth</label>
-                  <input
-                    id="signup-dob"
-                    className="auth-input auth-input-date"
-                    type="date"
-                    autoComplete="bday"
-                  />
-                </div>
-                <div className="auth-field">
-                  <label className="auth-label" htmlFor="signup-password">Password</label>
-                  <input
-                    id="signup-password"
-                    className="auth-input"
-                    type="password"
-                    placeholder="Min. 8 characters"
-                    autoComplete="new-password"
-                  />
-                </div>
+              <div className="auth-field">
+                <label className="auth-label" htmlFor="signup-password">Password</label>
+                <input
+                  id="signup-password"
+                  className="auth-input"
+                  type="password"
+                  placeholder="Min. 8 characters"
+                  autoComplete="new-password"
+                />
               </div>
 
-              <div className="auth-divider">
-                <span>Your data, your control</span>
-              </div>
-
-              <button className="auth-submit" type="button">
-                Create account →
+              <button
+                className="auth-submit"
+                type="button"
+                onClick={() => router.push('/auth/setup-profile')}
+              >
+                Continue →
               </button>
 
               <p className="auth-fine-print">
-                By creating an account you agree to our{' '}
+                By continuing you agree to our{' '}
                 <a href="#">Terms of Service</a> and{' '}
                 <a href="#">Privacy Policy</a>.
                 Already have an account?{' '}
-                <a
-                  href="#"
-                  onClick={e => { e.preventDefault(); setTab('signin') }}
-                >
+                <a href="#" onClick={e => { e.preventDefault(); switchTab('signin') }}>
                   Sign in
                 </a>
                 .
