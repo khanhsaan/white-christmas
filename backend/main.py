@@ -12,8 +12,12 @@ from pydantic import BaseModel
 from auth import get_current_user, get_optional_user
 from scramble import decode_image, generate_subkey, key_to_seed, protect_image
 from services.image_repo import (
+    accept_friend_request,
+    create_or_accept_friend_request,
     get_image_record,
+    get_images_shared_with_user,
     get_or_create_user_key,
+    list_friendships,
     get_user_id_by_email,
     get_user_images,
     grant_permission,
@@ -216,6 +220,13 @@ async def list_user_images(user=Depends(get_current_user)):
     return {"images": images}
 
 
+@app.get("/api/images/shared")
+async def list_shared_images(user=Depends(get_current_user)):
+    """Return images owned by others that are shared with this viewer."""
+    images = get_images_shared_with_user(str(user.id))
+    return {"images": images}
+
+
 # ============================================================
 # Decode — descramble using the user's own Fernet key
 # ============================================================
@@ -348,6 +359,14 @@ class GrantRequest(BaseModel):
     viewer_email: str
 
 
+class FriendRequestBody(BaseModel):
+    friend_email: str
+
+
+class FriendAcceptBody(BaseModel):
+    requester_id: str
+
+
 @app.post("/api/grant")
 async def grant_access(
     body: GrantRequest,
@@ -368,3 +387,51 @@ async def grant_access(
 
     grant_permission(owner_id, viewer_id)
     return {"status": "granted", "viewer_email": body.viewer_email}
+
+
+@app.post("/api/friends/request")
+async def send_friend_request(
+    body: FriendRequestBody,
+    user=Depends(get_current_user),
+):
+    requester_id = str(user.id)
+    addressee_id = get_user_id_by_email(body.friend_email)
+    if addressee_id is None:
+        raise HTTPException(status_code=404, detail=f"No user found with email: {body.friend_email}")
+    if addressee_id == requester_id:
+        raise HTTPException(status_code=400, detail="Cannot friend yourself")
+
+    result = create_or_accept_friend_request(requester_id, addressee_id)
+    if result["status"] == "accepted":
+        # Accepted friendships are mutual in WC.
+        grant_permission(requester_id, addressee_id)
+        grant_permission(addressee_id, requester_id)
+    return {
+        "status": result["status"],
+        "friend_email": body.friend_email,
+        "auto_accepted": result["auto_accepted"],
+    }
+
+
+@app.post("/api/friends/accept")
+async def accept_friend(
+    body: FriendAcceptBody,
+    user=Depends(get_current_user),
+):
+    addressee_id = str(user.id)
+    requester_id = body.requester_id
+    if requester_id == addressee_id:
+        raise HTTPException(status_code=400, detail="Invalid requester_id")
+
+    accepted = accept_friend_request(addressee_id=addressee_id, requester_id=requester_id)
+    if not accepted:
+        raise HTTPException(status_code=404, detail="No pending friend request found")
+
+    grant_permission(addressee_id, requester_id)
+    grant_permission(requester_id, addressee_id)
+    return {"status": "accepted", "requester_id": requester_id}
+
+
+@app.get("/api/friends")
+async def get_friends(user=Depends(get_current_user)):
+    return {"friends": list_friendships(str(user.id))}

@@ -104,16 +104,46 @@ def get_user_images(user_id: str) -> list[dict]:
     return result.data or []
 
 
+def get_images_shared_with_user(viewer_id: str) -> list[dict]:
+    """
+    Return image records owned by users who have granted this viewer access.
+    """
+    db = get_service_client()
+    links = (
+        db.table("allowed_users")
+        .select("owner_id")
+        .eq("viewer_id", viewer_id)
+        .execute()
+    )
+    owner_ids = sorted({row.get("owner_id") for row in (links.data or []) if row.get("owner_id")})
+    if not owner_ids:
+        return []
+
+    result = (
+        db.table("images")
+        .select("image_id, owner_id, storage_path, created_at")
+        .in_("owner_id", owner_ids)
+        .order("image_id", desc=True)
+        .execute()
+    )
+    return result.data or []
+
+
 def get_user_id_by_email(email: str) -> Optional[str]:
     """
     Look up a user's UUID by email using Supabase Admin API.
     Handles both object and dict response shapes.
     """
     db = get_service_client()
+    target = (email or "").strip().lower()
+    if not target:
+        return None
     response = db.auth.admin.list_users()
     users = []
 
-    if hasattr(response, "users") and response.users is not None:
+    if isinstance(response, list):
+        users = response
+    elif hasattr(response, "users") and response.users is not None:
         users = response.users
     elif isinstance(response, dict):
         users = response.get("users") or response.get("data", {}).get("users") or []
@@ -122,9 +152,140 @@ def get_user_id_by_email(email: str) -> Optional[str]:
         user_email = getattr(user, "email", None)
         if user_email is None and isinstance(user, dict):
             user_email = user.get("email")
-        if user_email == email:
+        if isinstance(user_email, str) and user_email.strip().lower() == target:
             user_id = getattr(user, "id", None)
             if user_id is None and isinstance(user, dict):
                 user_id = user.get("id")
             return str(user_id) if user_id else None
     return None
+
+
+def get_user_email_by_id(user_id: str) -> Optional[str]:
+    db = get_service_client()
+    response = db.auth.admin.list_users()
+    users = []
+
+    if isinstance(response, list):
+        users = response
+    elif hasattr(response, "users") and response.users is not None:
+        users = response.users
+    elif isinstance(response, dict):
+        users = response.get("users") or response.get("data", {}).get("users") or []
+
+    for user in users:
+        uid = getattr(user, "id", None)
+        if uid is None and isinstance(user, dict):
+            uid = user.get("id")
+        if str(uid) != user_id:
+            continue
+        email = getattr(user, "email", None)
+        if email is None and isinstance(user, dict):
+            email = user.get("email")
+        return str(email) if email else None
+    return None
+
+
+def create_or_accept_friend_request(requester_id: str, addressee_id: str) -> dict:
+    db = get_service_client()
+
+    direct = (
+        db.table("friendships")
+        .select("id, status")
+        .eq("requester_id", requester_id)
+        .eq("addressee_id", addressee_id)
+        .limit(1)
+        .execute()
+    )
+    if direct.data:
+        status = direct.data[0].get("status") or "pending"
+        return {"status": status, "auto_accepted": False}
+
+    reverse = (
+        db.table("friendships")
+        .select("id, status")
+        .eq("requester_id", addressee_id)
+        .eq("addressee_id", requester_id)
+        .limit(1)
+        .execute()
+    )
+    if reverse.data:
+        reverse_row = reverse.data[0]
+        reverse_status = reverse_row.get("status")
+        if reverse_status == "pending":
+            (
+                db.table("friendships")
+                .update({"status": "accepted", "accepted_at": "now()"})
+                .eq("id", reverse_row["id"])
+                .execute()
+            )
+            return {"status": "accepted", "auto_accepted": True}
+        return {"status": reverse_status or "accepted", "auto_accepted": False}
+
+    db.table("friendships").insert(
+        {
+            "requester_id": requester_id,
+            "addressee_id": addressee_id,
+            "status": "pending",
+        }
+    ).execute()
+    return {"status": "pending", "auto_accepted": False}
+
+
+def accept_friend_request(addressee_id: str, requester_id: str) -> bool:
+    db = get_service_client()
+    existing = (
+        db.table("friendships")
+        .select("id, status")
+        .eq("requester_id", requester_id)
+        .eq("addressee_id", addressee_id)
+        .limit(1)
+        .execute()
+    )
+    if not existing.data:
+        return False
+    row = existing.data[0]
+    if row.get("status") == "accepted":
+        return True
+    (
+        db.table("friendships")
+        .update({"status": "accepted", "accepted_at": "now()"})
+        .eq("id", row["id"])
+        .execute()
+    )
+    return True
+
+
+def list_friendships(user_id: str) -> list[dict]:
+    db = get_service_client()
+    sent = (
+        db.table("friendships")
+        .select("requester_id, addressee_id, status, created_at, accepted_at")
+        .eq("requester_id", user_id)
+        .execute()
+    )
+    received = (
+        db.table("friendships")
+        .select("requester_id, addressee_id, status, created_at, accepted_at")
+        .eq("addressee_id", user_id)
+        .execute()
+    )
+    rows = (sent.data or []) + (received.data or [])
+    out: list[dict] = []
+    for row in rows:
+        requester_id = row.get("requester_id")
+        addressee_id = row.get("addressee_id")
+        if not requester_id or not addressee_id:
+            continue
+        is_requester = requester_id == user_id
+        friend_id = addressee_id if is_requester else requester_id
+        out.append(
+            {
+                "friend_id": friend_id,
+                "friend_email": get_user_email_by_id(friend_id),
+                "status": row.get("status") or "pending",
+                "direction": "outgoing" if is_requester else "incoming",
+                "created_at": row.get("created_at"),
+                "accepted_at": row.get("accepted_at"),
+            }
+        )
+    return out
