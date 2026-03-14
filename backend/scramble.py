@@ -270,6 +270,7 @@ def protect_image(
     subkey: str,
     blocks: int = 32,
     size: int = 512,
+    keep_original_size: bool = True,
 ) -> Tuple[bytes, bytes, int]:
     """
     Scramble an image with the given subkey.
@@ -280,7 +281,14 @@ def protect_image(
         clean_jpeg_bytes  — no visible watermark, stored in DB for decoding
         social_jpeg_bytes — has visible watermark, returned to user to post on social media
     """
-    img = load_and_resize(image_bytes, size=size)
+    # Decode once so we can preserve original output dimensions if requested.
+    nparr = np.frombuffer(image_bytes, np.uint8)
+    original_img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if original_img is None:
+        raise ValueError("Could not decode image")
+    original_h, original_w = original_img.shape[:2]
+
+    img = cv2.resize(original_img, (size, size), interpolation=cv2.INTER_AREA)
 
     image_id_24 = compute_image_id_24(img)
 
@@ -289,6 +297,10 @@ def protect_image(
 
     # Clean version: only invisible DCT watermark (safe to decode from)
     clean = embed_dct_id(scrambled.copy(), image_id_24)
+
+    if keep_original_size:
+        clean = cv2.resize(clean, (original_w, original_h), interpolation=cv2.INTER_LINEAR)
+
     success, clean_buf = cv2.imencode(".jpg", clean, [cv2.IMWRITE_JPEG_QUALITY, 95])
     if not success:
         raise RuntimeError("Failed to encode clean scrambled image")

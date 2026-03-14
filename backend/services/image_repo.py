@@ -75,6 +75,19 @@ def grant_permission(owner_id: str, viewer_id: str) -> None:
     ).execute()
 
 
+def get_user_images(user_id: str) -> list[dict]:
+    """Return all image records owned by user_id, newest first."""
+    db = get_service_client()
+    result = (
+        db.table("images")
+        .select("image_id, storage_path, created_at")
+        .eq("owner_id", user_id)
+        .order("image_id", desc=True)
+        .execute()
+    )
+    return result.data or []
+
+
 def get_user_id_by_email(email: str) -> Optional[str]:
     """
     Look up a user's UUID by email using Supabase Admin API.

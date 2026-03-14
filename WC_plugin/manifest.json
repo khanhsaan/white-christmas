@@ -1,25 +1,25 @@
 {
-    "manifest_version": 3,
-    "name": "Protected Image Unscrambler (Demo)",
-    "version": "0.1",
-    "description": "Decodes block-scrambled protected images with suffix _protected.jpg.",
-    "host_permissions": [
-      "http://localhost:5001/*"
-    ],
-    "permissions": [
-      "storage",
-      "declarativeNetRequest",
-      "declarativeNetRequestWithHostAccess"
-    ],
-    "content_security_policy": {
-      "extension_pages": "script-src 'self'; object-src 'self'"
-    },
-    "content_scripts": [
-      {
-        "matches": ["<all_urls>"],
-        "js": ["contentScript.js"],
-        "run_at": "document_idle"
-      }
-    ]
-  }
-    
+  "manifest_version": 3,
+  "name": "Protected Image Unscrambler (Demo)",
+  "version": "0.1",
+  "description": "Decodes block-scrambled protected images with suffix _protected.jpg.",
+  "host_permissions": [
+    "http://localhost:5001/*"
+  ],
+  "permissions": [
+    "storage",
+    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["contentScript.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
+  

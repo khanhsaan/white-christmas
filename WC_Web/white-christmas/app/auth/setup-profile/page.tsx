@@ -1,8 +1,24 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function SetupProfilePage() {
+  const router = useRouter()
+  const { setUpProfile, loading, error } = useAuth()
+
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName]   = useState('')
+  const [dob, setDob]             = useState('')
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const { error } = await setUpProfile({ firstName, lastName, dob })
+    if (!error) router.push('/library')
+  }
+
   return (
     <>
       {/* ── NAV ─────────────────────────────────────────── */}
@@ -43,7 +59,7 @@ export default function SetupProfilePage() {
             </div>
             <div className="auth-tier-row">
               <span className="auth-tier-glyph" style={{ color: '#555' }}>③ Done</span>
-              <span className="auth-tier-caption" style={{ color: '#555' }}>Start encoding</span>
+              <span className="auth-tier-caption" style={{ color: '#555' }}>Go to your library</span>
             </div>
           </div>
         </div>
@@ -57,7 +73,9 @@ export default function SetupProfilePage() {
             <span className="auth-tab active">Profile</span>
           </div>
 
-          <form className="auth-form" onSubmit={e => e.preventDefault()}>
+          {error && <p className="auth-error">{error}</p>}
+
+          <form className="auth-form" onSubmit={handleSubmit}>
             <div className="auth-row">
               <div className="auth-field">
                 <label className="auth-label" htmlFor="profile-first">First name</label>
@@ -67,6 +85,8 @@ export default function SetupProfilePage() {
                   type="text"
                   placeholder="Jane"
                   autoComplete="given-name"
+                  value={firstName}
+                  onChange={e => setFirstName(e.target.value)}
                 />
               </div>
               <div className="auth-field">
@@ -77,6 +97,8 @@ export default function SetupProfilePage() {
                   type="text"
                   placeholder="Doe"
                   autoComplete="family-name"
+                  value={lastName}
+                  onChange={e => setLastName(e.target.value)}
                 />
               </div>
             </div>
@@ -88,6 +110,8 @@ export default function SetupProfilePage() {
                 className="auth-input auth-input-date"
                 type="date"
                 autoComplete="bday"
+                value={dob}
+                onChange={e => setDob(e.target.value)}
               />
             </div>
 
@@ -95,8 +119,8 @@ export default function SetupProfilePage() {
               <span>Your data stays yours</span>
             </div>
 
-            <button className="auth-submit" type="button">
-              Save and continue →
+            <button className="auth-submit" type="submit" disabled={loading}>
+              {loading ? 'Saving…' : 'Save and continue →'}
             </button>
 
             <p className="auth-fine-print">

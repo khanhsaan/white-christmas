@@ -1,26 +1,27 @@
 // ===============================
-// CONFIG — SCRAMBLE + DCT-ID
+// CONFIG
 // ===============================
 
-const BLOCKS = 32;
-const SCRAMBLE_SEED = 435681395; // must match Python key "demo-key-123"
-const PATCH_SIZE = 16;
-const MARKER_BYTE = 0xAC;        // must match Python
-const SERVER_BASE = "http://localhost:5001"; // Flask server
+const BLOCKS       = 32;
+const SCRAMBLE_SEED = 435681395; // SHA-256("demo-key-123") % 2^32 — must match Python
+const PATCH_SIZE   = 16;
+const MARKER_BYTE  = 0xAC;       // 8-bit marker: 1010 1100 — must match Python
+const SERVER_BASE  = "http://localhost:5001";
+const VIEWER_ID    = "viewer-demo"; // set this to the authenticated viewer id
 
-// Visible watermark config
-const VIS_BLOCK_SIZE = 8;  // 8x8 pixels per bit
-const VIS_COLS = 8;
-const VIS_ROWS = 4;
-const VIS_BORDER = 2;
+const VIS_BLOCK_SIZE = 8;  // px per watermark bit
+const VIS_COLS       = 8;
+const VIS_ROWS       = 4;
+const VIS_BORDER     = 2;
 
 
 // ===============================
-// 1. RNG + helper canvas
+// 1. PRNG + canvas helper
 // ===============================
-function mulberry32(a) {
+
+function mulberry32(seed) {
   return function () {
-    let t = (a += 0x6D2B79F5);
+    let t = (seed += 0x6D2B79F5);
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
@@ -28,9 +29,7 @@ function mulberry32(a) {
 }
 
 function makeCanvas(width, height) {
-  if (typeof OffscreenCanvas !== "undefined") {
-    return new OffscreenCanvas(width, height);
-  }
+  if (typeof OffscreenCanvas !== "undefined") return new OffscreenCanvas(width, height);
   const c = document.createElement("canvas");
   c.width = width;
   c.height = height;
@@ -39,339 +38,272 @@ function makeCanvas(width, height) {
 
 
 // ===============================
-// 2. Block order (scramble mode)
+// 2. Block order (Fisher-Yates shuffle)
 // ===============================
+
 function generateBlockOrder(numBlocks, seed) {
   const rand = mulberry32(seed);
-  const arr = [];
-  for (let i = 0; i < numBlocks; i++) arr.push(i);
+  const arr  = Array.from({ length: numBlocks }, (_, i) => i);
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(rand() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
 }
-const BLOCK_ORDER = generateBlockOrder(BLOCKS * BLOCKS, SCRAMBLE_SEED);
+
+// Precomputed default order for the hardcoded seed.
+// Pass a different blockOrder to descramble() for per-image SK-derived seeds.
+const DEFAULT_BLOCK_ORDER = generateBlockOrder(BLOCKS * BLOCKS, SCRAMBLE_SEED);
+
+async function fetchBlockOrder(imageId) {
+  try {
+    const url = `${SERVER_BASE}/unscramble/${imageId}?viewer_id=${encodeURIComponent(VIEWER_ID)}`;
+    const resp = await fetch(url, { cache: "no-store" });
+    if (!resp.ok) throw new Error(`unscramble ${resp.status}`);
+
+    const payload = await resp.json();
+    if (!Number.isInteger(payload.scramble_seed)) throw new Error("Missing scramble_seed");
+
+    const mode = payload.mode || "unknown";
+    console.log(`[SAI] Seed mode=${mode} image=${imageId}`);
+    return generateBlockOrder(BLOCKS * BLOCKS, payload.scramble_seed);
+  } catch (err) {
+    console.warn(`[SAI] Seed fetch failed for image ${imageId}; using legacy default.`, err?.message ?? err);
+    return DEFAULT_BLOCK_ORDER;
+  }
+}
 
 
 // ===============================
-// 3. DCT 2D (PATCH_SIZE x PATCH_SIZE)
+// 3. Separable DCT-2D with precomputed tables
+//    O(N³) separable vs O(N⁴) naive — ~8× faster for N=16
 // ===============================
-function dct2D(matrix) {
-  const N = matrix.length;
-  const out = Array.from({ length: N }, () => new Array(N).fill(0));
-  const alpha = (k) => (k === 0 ? Math.sqrt(1 / N) : Math.sqrt(2 / N));
 
-  for (let u = 0; u < N; u++) {
-    for (let v = 0; v < N; v++) {
-      let sum = 0;
-      for (let x = 0; x < N; x++) {
-        for (let y = 0; y < N; y++) {
-          sum +=
-            matrix[x][y] *
-            Math.cos((Math.PI * (2 * x + 1) * u) / (2 * N)) *
-            Math.cos((Math.PI * (2 * y + 1) * v) / (2 * N));
-        }
-      }
-      out[u][v] = alpha(u) * alpha(v) * sum;
-    }
+const DCT_ALPHA = Float64Array.from(
+  { length: PATCH_SIZE },
+  (_, k) => (k === 0 ? Math.sqrt(1 / PATCH_SIZE) : Math.sqrt(2 / PATCH_SIZE))
+);
+
+const DCT_COS = Array.from({ length: PATCH_SIZE }, (_, k) =>
+  Float64Array.from({ length: PATCH_SIZE }, (_, n) =>
+    Math.cos((Math.PI * (2 * n + 1) * k) / (2 * PATCH_SIZE))
+  )
+);
+
+function dct1D(input) {
+  const N   = input.length;
+  const out = new Float64Array(N);
+  for (let k = 0; k < N; k++) {
+    let sum = 0;
+    for (let n = 0; n < N; n++) sum += input[n] * DCT_COS[k][n];
+    out[k] = DCT_ALPHA[k] * sum;
   }
   return out;
 }
 
-// bit-pair layout must match Python get_dct_pairs()
-function getDctPairs() {
-  const pairs = [];
-  for (let bitIndex = 0; bitIndex < 32; bitIndex++) {
-    const row = Math.floor(bitIndex / 8);
-    const col = bitIndex % 8;
+function dct2D(matrix) {
+  const N      = matrix.length;
+  const rowDct = matrix.map(row => dct1D(row));
 
-    const u1 = 2 + col;
-    const v1 = 2 + 2 * row;
-    const u2 = u1;
-    const v2 = v1 + 1;
-
-    pairs.push([[u1, v1], [u2, v2]]);
+  const out = Array.from({ length: N }, () => new Float64Array(N));
+  const col = new Float64Array(N);
+  for (let c = 0; c < N; c++) {
+    for (let r = 0; r < N; r++) col[r] = rowDct[r][c];
+    const colResult = dct1D(col);
+    for (let r = 0; r < N; r++) out[r][c] = colResult[r];
   }
-  return pairs;
+  return out;
 }
-const BIT_PAIRS = getDctPairs();
+
+// Bit-pair layout must match Python get_dct_pairs()
+const BIT_PAIRS = Array.from({ length: 32 }, (_, i) => {
+  const u = 2 + (i % 8);
+  const v = 2 + 2 * Math.floor(i / 8);
+  return [[u, v], [u, v + 1]];
+});
 
 
 // ===============================
-// 4A. Extract ID from visible watermark (primary method for FB)
+// 4. Shared bit decoder
 // ===============================
-async function extractImageIdFromVisibleWatermark(img) {
-  try {
-    const width = img.naturalWidth;
-    const height = img.naturalHeight;
-    
-    const watermark_w = VIS_COLS * VIS_BLOCK_SIZE + 2 * VIS_BORDER;
-    const watermark_h = VIS_ROWS * VIS_BLOCK_SIZE + 2 * VIS_BORDER;
-    
-    if (width < watermark_w + 20 || height < watermark_h + 20) {
-      return null;  // Image too small
-    }
 
-    const resp = await fetch(img.src);
-    if (!resp.ok) return null;
-    const blob = await resp.blob();
-    const bitmap = await createImageBitmap(blob);
+function decodeBits(bits) {
+  let marker = 0;
+  for (let i = 0; i < 8; i++) marker = (marker << 1) | bits[i];
+  if (marker !== MARKER_BYTE) return null;
 
-    const canvas = makeCanvas(bitmap.width, bitmap.height);
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(bitmap, 0, 0);
-
-    // Sample top-right corner (where watermark should be)
-    const start_x = width - watermark_w - 10;
-    const start_y = 10;
-    
-    const imgData = ctx.getImageData(start_x, start_y, watermark_w, watermark_h);
-    const data = imgData.data;
-
-    // Extract 32 bits
-    const bits = [];
-    for (let bit_idx = 0; bit_idx < 32; bit_idx++) {
-      const row = Math.floor(bit_idx / VIS_COLS);
-      const col = bit_idx % VIS_COLS;
-      
-      // Center of the block
-      const y = VIS_BORDER + row * VIS_BLOCK_SIZE + VIS_BLOCK_SIZE / 2;
-      const x = VIS_BORDER + col * VIS_BLOCK_SIZE + VIS_BLOCK_SIZE / 2;
-      
-      const idx = (Math.floor(y) * watermark_w + Math.floor(x)) * 4;
-      const r = data[idx];
-      const g = data[idx + 1];
-      const b = data[idx + 2];
-      
-      const brightness = (r + g + b) / 3;
-      const bit = brightness > 128 ? 1 : 0;  // Threshold
-      bits.push(bit);
-    }
-
-    // Check marker (first 8 bits)
-    let marker = 0;
-    for (let i = 0; i < 8; i++) {
-      marker = (marker << 1) | bits[i];
-    }
-
-    if (marker !== MARKER_BYTE) {
-      console.log(`[SAI] Visible watermark marker mismatch: 0x${marker.toString(16)} (expected 0x${MARKER_BYTE.toString(16)})`);
-      return null;
-    }
-
-    // Extract ID (next 24 bits)
-    let id24 = 0;
-    for (let i = 8; i < 32; i++) {
-      id24 = (id24 << 1) | bits[i];
-    }
-
-    console.log("[SAI] ✓ Visible watermark detected. Image ID =", id24);
-    return id24;
-
-  } catch (err) {
-    console.warn("[SAI] Failed to extract visible watermark:", err);
-    return null;
-  }
+  let id24 = 0;
+  for (let i = 8; i < 32; i++) id24 = (id24 << 1) | bits[i];
+  return id24;
 }
 
 
 // ===============================
-// 4B. Extract ID from DCT patch (fallback)
+// 5A. Extract ID from visible watermark (primary — survives FB re-encoding)
 // ===============================
-async function extractImageIdFromDct(img) {
-  try {
-    const width = img.naturalWidth;
-    const height = img.naturalHeight;
-    if (width < PATCH_SIZE || height < PATCH_SIZE) return null;
 
-    const resp = await fetch(img.src);  // Removed { mode: "cors" } for Facebook compatibility
-    if (!resp.ok) {
-      console.warn("[SAI] Failed to fetch image:", resp.status);
-      return null;
-    }
-    const blob = await resp.blob();
-    const bitmap = await createImageBitmap(blob);
+function extractIdVisible(bitmap) {
+  const { width, height } = bitmap;
+  const wmW = VIS_COLS * VIS_BLOCK_SIZE + 2 * VIS_BORDER;
+  const wmH = VIS_ROWS * VIS_BLOCK_SIZE + 2 * VIS_BORDER;
+  if (width < wmW + 20 || height < wmH + 20) return null;
 
-    const canvas = makeCanvas(bitmap.width, bitmap.height);
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(bitmap, 0, 0);
+  // Crop only the watermark region into a small canvas — avoids full-size allocation
+  const canvas = makeCanvas(wmW, wmH);
+  const ctx    = canvas.getContext("2d");
+  ctx.drawImage(bitmap, width - wmW - 10, 10, wmW, wmH, 0, 0, wmW, wmH);
+  const { data } = ctx.getImageData(0, 0, wmW, wmH);
 
-    const imgData = ctx.getImageData(0, 0, PATCH_SIZE, PATCH_SIZE);
-    const data = imgData.data;
+  const bits = Array.from({ length: 32 }, (_, i) => {
+    const row = Math.floor(i / VIS_COLS);
+    const col = i % VIS_COLS;
+    const y   = Math.floor(VIS_BORDER + row * VIS_BLOCK_SIZE + VIS_BLOCK_SIZE / 2);
+    const x   = Math.floor(VIS_BORDER + col * VIS_BLOCK_SIZE + VIS_BLOCK_SIZE / 2);
+    const p   = (y * wmW + x) * 4;
+    return (data[p] + data[p + 1] + data[p + 2]) / 3 > 128 ? 1 : 0;
+  });
 
-    // Build grayscale matrix
-    const M = Array.from({ length: PATCH_SIZE }, () => new Array(PATCH_SIZE).fill(0));
-    let idx = 0;
-    for (let y = 0; y < PATCH_SIZE; y++) {
-      for (let x = 0; x < PATCH_SIZE; x++) {
-        const r = data[idx];
-        const g = data[idx + 1];
-        const b = data[idx + 2];
-        const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-        M[y][x] = gray;
-        idx += 4;
-      }
-    }
-
-    const D = dct2D(M);
-
-    // Decode 32 bits from coefficient pairs
-    const bits = [];
-    for (let bitIndex = 0; bitIndex < 32; bitIndex++) {
-      const [[u1, v1], [u2, v2]] = BIT_PAIRS[bitIndex];
-      const c1 = D[u1][v1];
-      const c2 = D[u2][v2];
-      const diff = c1 - c2;
-      const bit = diff >= 0 ? 1 : 0;
-      bits.push(bit);
-    }
-
-    // Check marker prefix bits[0..7]
-    let marker = 0;
-    for (let i = 0; i < 8; i++) {
-      marker = (marker << 1) | bits[i];
-    }
-    if (marker !== MARKER_BYTE) {
-      // Not our image
-      return null;
-    }
-
-    // Remaining 24 bits => image ID
-    let id24 = 0;
-    for (let i = 8; i < 32; i++) {
-      id24 = (id24 << 1) | bits[i];
-    }
-
-    console.log("[SAI] DCT marker OK. Image ID =", id24);
-    return id24;
-
-  } catch (err) {
-    console.warn("[SAI] Failed to extract DCT ID:", err);
-    return null;
-  }
+  return decodeBits(bits);
 }
 
 
 // ===============================
-// 5. SCRAMBLE decode using server-sourced scrambled image
+// 5B. Extract ID from DCT patch (fallback)
 // ===============================
-async function descrambleFromServer(img, imageId) {
-  try {
-    const targetW = img.naturalWidth;
-    const targetH = img.naturalHeight;
 
-    // 1) Fetch clean scrambled image from server
-    const url = `${SERVER_BASE}/image/${imageId}`;
-    const resp = await fetch(url);
-    if (!resp.ok) {
-      console.error("[SAI] Failed to fetch server image:", resp.status, resp.statusText);
-      return;
-    }
-    const blob = await resp.blob();
-    const bitmap = await createImageBitmap(blob);
+function extractIdDct(bitmap) {
+  if (bitmap.width < PATCH_SIZE || bitmap.height < PATCH_SIZE) return null;
 
-    // 2) Scale server image to Facebook displayed size
-    const scaledCanvas = makeCanvas(targetW, targetH);
-    const scaledCtx = scaledCanvas.getContext("2d");
-    scaledCtx.drawImage(bitmap, 0, 0, targetW, targetH);
+  // Crop only the top-left PATCH_SIZE × PATCH_SIZE — avoids full-size allocation
+  const canvas = makeCanvas(PATCH_SIZE, PATCH_SIZE);
+  const ctx    = canvas.getContext("2d");
+  ctx.drawImage(bitmap, 0, 0, PATCH_SIZE, PATCH_SIZE, 0, 0, PATCH_SIZE, PATCH_SIZE);
+  const { data } = ctx.getImageData(0, 0, PATCH_SIZE, PATCH_SIZE);
 
-    // 3) Unscramble on scaled version
-    const outCanvas = makeCanvas(targetW, targetH);
-    const outCtx = outCanvas.getContext("2d");
+  let p = 0;
+  const M = Array.from({ length: PATCH_SIZE }, () =>
+    Array.from({ length: PATCH_SIZE }, () => {
+      const gray = 0.299 * data[p] + 0.587 * data[p + 1] + 0.114 * data[p + 2];
+      p += 4;
+      return gray;
+    })
+  );
 
-    const blockSize = targetW / BLOCKS;
-
-    for (let originalIndex = 0; originalIndex < BLOCK_ORDER.length; originalIndex++) {
-      const scrambledIndex = BLOCK_ORDER[originalIndex];
-
-      const srcY = Math.floor(scrambledIndex / BLOCKS);
-      const srcX = scrambledIndex % BLOCKS;
-
-      const dstY = Math.floor(originalIndex / BLOCKS);
-      const dstX = originalIndex % BLOCKS;
-
-      outCtx.drawImage(
-        scaledCanvas,
-        srcX * blockSize, srcY * blockSize, blockSize, blockSize,
-        dstX * blockSize, dstY * blockSize, blockSize, blockSize
-      );
-    }
-
-    const finalURL =
-      outCanvas.convertToBlob
-        ? URL.createObjectURL(await outCanvas.convertToBlob())
-        : outCanvas.toDataURL("image/jpeg");
-
-    img.src = finalURL;
-    img.dataset.unscrambled = "true";
-    console.log("[SAI] Decoded (scaled) from server image ID", imageId);
-
-  } catch (err) {
-    console.error("[SAI] descrambleFromServer failed:", err);
-  }
+  const D    = dct2D(M);
+  const bits = BIT_PAIRS.map(([[u1, v1], [u2, v2]]) => D[u1][v1] >= D[u2][v2] ? 1 : 0);
+  return decodeBits(bits);
 }
 
 
 // ===============================
-// 6. PROCESS IMAGE
+// 6. Descramble using server-sourced clean image
 // ===============================
+
+async function descramble(img, imageId, blockOrder = DEFAULT_BLOCK_ORDER) {
+  const { naturalWidth: w, naturalHeight: h } = img;
+
+  const resp = await fetch(`${SERVER_BASE}/image/${imageId}?ts=${Date.now()}`, { cache: "no-store" });
+  if (!resp.ok) throw new Error(`Server ${resp.status} for image ${imageId}`);
+  const serverBitmap = await createImageBitmap(await resp.blob());
+
+  // Scale server image to the element's displayed dimensions
+  const scaled    = makeCanvas(w, h);
+  scaled.getContext("2d").drawImage(serverBitmap, 0, 0, w, h);
+
+  // Use integer block sizes matching Python's (h // blocks) to avoid per-block drift.
+  // The border remainder (w % BLOCKS pixels) stays black, same as Python's np.zeros_like.
+  const out    = makeCanvas(w, h);
+  const outCtx = out.getContext("2d");
+  const bw     = Math.floor(w / BLOCKS);
+  const bh     = Math.floor(h / BLOCKS);
+
+  for (let orig = 0; orig < blockOrder.length; orig++) {
+    const scr = blockOrder[orig];
+    outCtx.drawImage(
+      scaled,
+      (scr  % BLOCKS) * bw, Math.floor(scr  / BLOCKS) * bh, bw, bh,
+      (orig % BLOCKS) * bw, Math.floor(orig / BLOCKS) * bh, bw, bh,
+    );
+  }
+
+  const newURL = out.convertToBlob
+    ? URL.createObjectURL(await out.convertToBlob({ type: "image/jpeg", quality: 0.95 }))
+    : out.toDataURL("image/jpeg", 0.95);
+
+  // Revoke the old blob URL if we created it, to free memory
+  if (img.src.startsWith("blob:")) URL.revokeObjectURL(img.src);
+
+  img.src = newURL;
+  img.dataset.unscrambled = "true";
+  console.log("[SAI] ✓ Descrambled image ID", imageId);
+}
+
+
+// ===============================
+// 7. Process a single image
+// ===============================
+
+const inFlight = new Set(); // prevents duplicate parallel processing of the same element
+
+function waitForLoad(img) {
+  if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    img.addEventListener("load",  resolve, { once: true });
+    img.addEventListener("error", reject,  { once: true });
+  });
+}
+
 async function processImage(img) {
+  if (!img?.src)                                         return;
+  if (img.dataset.unscrambled === "true")                return;
+  if (img.src.startsWith("data:") || img.src.startsWith("blob:")) return;
+  if (inFlight.has(img))                                 return;
+
+  inFlight.add(img);
   try {
-    if (!img || img.dataset.unscrambled === "true") return;
-    if (!img.src) return;
+    await waitForLoad(img);
 
-    console.log("[SAI] Checking image:", img.src.substring(0, 100));
+    // Re-check src after load — it may have changed or become a blob
+    if (!img.src || img.src.startsWith("data:") || img.src.startsWith("blob:")) return;
 
-    // Try visible watermark first (survives Facebook processing)
-    let imageId = await extractImageIdFromVisibleWatermark(img);
-    
-    // Fall back to DCT watermark
-    if (imageId == null) {
-      imageId = await extractImageIdFromDct(img);
-    }
-    
-    if (imageId == null) {
-      console.log("[SAI] No protected marker found in this image");
-      return;
-    }
+    // Single fetch shared by both extractors
+    const fetchResp = await fetch(img.src);
+    if (!fetchResp.ok) return;
+    const bitmap = await createImageBitmap(await fetchResp.blob());
 
-    console.log("[SAI] ✓ Protected image detected, ID =", imageId);
-    console.log("[SAI] Image source:", img.src);
-    await descrambleFromServer(img, imageId);
+    const imageId = extractIdVisible(bitmap) ?? extractIdDct(bitmap);
+    if (imageId == null) return;
+
+    console.log("[SAI] ✓ Protected image detected — ID:", imageId, "src:", img.src.slice(0, 80));
+    const blockOrder = await fetchBlockOrder(imageId);
+    await descramble(img, imageId, blockOrder);
 
   } catch (err) {
-    console.error("[SAI] processImage failed:", err);
+    // Silently drop load/CORS failures for non-protected images;
+    // only log genuine plugin errors (not the image's own load error Event)
+    if (!(err instanceof Event)) console.warn("[SAI]", err.message ?? err);
+  } finally {
+    inFlight.delete(img);
   }
 }
 
 
 // ===============================
-// 7. Initial scan + MutationObserver
+// 8. Initial scan + MutationObserver
 // ===============================
-console.log("[SAI] 🔍 Protected Image Unscrambler extension loaded");
 
-function scanAllImages() {
-  const imgs = document.querySelectorAll("img");
-  console.log(`[SAI] Scanning ${imgs.length} images on page`);
-  imgs.forEach((img) => processImage(img));
-}
+console.log("[SAI] Protected Image Unscrambler loaded");
 
-scanAllImages();
+document.querySelectorAll("img").forEach(processImage);
 
-const observer = new MutationObserver((mutations) => {
-  for (const m of mutations) {
-    for (const node of m.addedNodes) {
+new MutationObserver(mutations => {
+  for (const { addedNodes } of mutations) {
+    for (const node of addedNodes) {
       if (node.tagName === "IMG") {
         processImage(node);
-      } else if (node.querySelectorAll) {
-        node.querySelectorAll("img").forEach((img) => processImage(img));
+      } else {
+        node.querySelectorAll?.("img").forEach(processImage);
       }
     }
   }
-});
-
-observer.observe(document.documentElement || document.body, {
-  childList: true,
-  subtree: true,
-});
+}).observe(document.documentElement ?? document.body, { childList: true, subtree: true });

@@ -9,7 +9,7 @@ type Tab = 'signin' | 'signup'
 
 export default function AuthPage() {
   const router = useRouter()
-  const { signIn, loading, error } = useAuth()
+  const { signIn, signUp, loading, error } = useAuth()
 
   const [tab, setTab] = useState<Tab>('signin')
 
@@ -17,11 +17,21 @@ export default function AuthPage() {
   const [siEmail, setSiEmail]       = useState('')
   const [siPassword, setSiPassword] = useState('')
 
+  // ── Sign-up state ──────────────────────────────────────
+  const [suEmail, setSuEmail]       = useState('')
+  const [suPassword, setSuPassword] = useState('')
+
   // ── Handlers ───────────────────────────────────────────
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault()
     const { error } = await signIn({ email: siEmail, password: siPassword })
-    if (!error) router.push('/')
+    if (!error) router.push('/library')
+  }
+
+  async function handleSignUp(e: React.FormEvent) {
+    e.preventDefault()
+    const { error } = await signUp({ email: suEmail, password: suPassword })
+    if (!error) router.push('/auth/setup-profile')
   }
 
   function switchTab(next: Tab) {
@@ -160,7 +170,7 @@ export default function AuthPage() {
 
           {/* ── SIGN UP FORM ──────────────────────────── */}
           {tab === 'signup' && (
-            <form className="auth-form" onSubmit={e => e.preventDefault()}>
+            <form className="auth-form" onSubmit={handleSignUp}>
               <div className="auth-field">
                 <label className="auth-label" htmlFor="signup-email">Email address</label>
                 <input
@@ -169,6 +179,9 @@ export default function AuthPage() {
                   type="email"
                   placeholder="you@example.com"
                   autoComplete="email"
+                  required
+                  value={suEmail}
+                  onChange={e => setSuEmail(e.target.value)}
                 />
               </div>
 
@@ -180,15 +193,18 @@ export default function AuthPage() {
                   type="password"
                   placeholder="Min. 8 characters"
                   autoComplete="new-password"
+                  required
+                  value={suPassword}
+                  onChange={e => setSuPassword(e.target.value)}
                 />
               </div>
 
               <button
                 className="auth-submit"
-                type="button"
-                onClick={() => router.push('/auth/setup-profile')}
+                type="submit"
+                disabled={loading}
               >
-                Continue →
+                {loading ? 'Creating account…' : 'Continue →'}
               </button>
 
               <p className="auth-fine-print">

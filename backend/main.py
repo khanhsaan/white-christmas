@@ -13,6 +13,7 @@ from services.image_repo import (
     get_image_record,
     get_or_create_user_key,
     get_user_id_by_email,
+    get_user_images,
     grant_permission,
     has_permission,
     save_image_metadata,
@@ -184,6 +185,16 @@ async def _encode_impl(
             "X-Image-ID": str(image_id),
         },
     )
+
+
+# ============================================================
+# Images — list all images belonging to the authenticated user
+# ============================================================
+@app.get("/api/images")
+async def list_user_images(user=Depends(get_current_user)):
+    """Return all image records for the authenticated user, newest first."""
+    images = get_user_images(str(user.id))
+    return {"images": images}
 
 
 # ============================================================

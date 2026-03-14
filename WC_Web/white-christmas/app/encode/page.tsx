@@ -148,6 +148,7 @@ export default function EncodePage() {
         <ul>
           <li><Link href="/#how">How it works</Link></li>
           <li><Link href="/#access">Access tiers</Link></li>
+          <li><Link href="/library">Library</Link></li>
           <li><Link href="/auth">Sign in</Link></li>
           <li><Link href="/auth" className="nav-cta">Get access</Link></li>
         </ul>
