@@ -231,25 +231,9 @@ export default function EncodePage() {
                 </button>
               )}
               {stage === 'done' && (
-                <div style={{ display: 'grid', gap: '0.75rem' }}>
-                  <button
-                    className="btn-primary"
-                    onClick={() => {
-                      if (!protectedImageUrl) return
-                      const link = document.createElement('a')
-                      link.download = imageId
-                        ? `white-christmas-protected-${imageId}.jpg`
-                        : 'white-christmas-protected.jpg'
-                      link.href = protectedImageUrl
-                      link.click()
-                    }}
-                  >
-                    Download protected image
-                  </button>
-                  <button className="btn-ghost-dark" onClick={reset}>
-                    Upload another
-                  </button>
-                </div>
+                <button className="btn-ghost-dark" onClick={reset}>
+                  Upload another
+                </button>
               )}
             </div>
 
@@ -294,6 +278,21 @@ export default function EncodePage() {
                 )
               )}
 
+              {stage === 'done' && protectedImageUrl && (
+                <button
+                  className="btn-primary"
+                  onClick={() => {
+                    const link = document.createElement('a')
+                    link.download = imageId
+                      ? `white-christmas-protected-${imageId}.jpg`
+                      : 'white-christmas-protected.jpg'
+                    link.href = protectedImageUrl
+                    link.click()
+                  }}
+                >
+                  Download protected image
+                </button>
+              )}
               {stage === 'done' && imageId && (
                 <p className="upload-sub" style={{ color: '#2a2a2a' }}>
                   ID: {imageId}
