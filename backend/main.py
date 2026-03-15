@@ -29,8 +29,11 @@ from services.image_repo import (
 )
 from services.storage_repo import (
     download_protected_image,
+    download_social_image,
+    get_social_path,
     get_storage_path,
     upload_protected_image,
+    upload_social_image,
 )
 from services.supabase_client import get_auth_client
 
@@ -198,6 +201,7 @@ async def _encode_impl(
         encrypted_subkey = Fernet(master_key.encode()).encrypt(subkey.encode()).decode()
         storage_path = get_storage_path(image_id)
         upload_protected_image(storage_path, clean_bytes)
+        upload_social_image(image_id, social_bytes)
         save_image_metadata(image_id, user_id, encrypted_subkey, storage_path)
 
     output = social_bytes if version == "social" else clean_bytes
@@ -358,6 +362,36 @@ async def get_scrambled_image_file(
         io.BytesIO(image_bytes),
         media_type="image/jpeg",
         headers={"Content-Disposition": f"inline; filename={filename}"},
+    )
+
+
+@app.get("/api/images/{image_id}/social")
+async def get_social_image_file(
+    image_id: int,
+    user=Depends(get_current_user),
+):
+    """
+    Return the social version of the image (scrambled + visible watermark).
+    Only the owner can fetch this — it's the version meant for social media.
+    """
+    viewer_id = str(user.id)
+    record = get_image_record(image_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    owner_id = record.get("owner_id")
+    if viewer_id != owner_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    try:
+        image_bytes = download_social_image(image_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Social image not found in storage")
+
+    return StreamingResponse(
+        io.BytesIO(image_bytes),
+        media_type="image/jpeg",
+        headers={"Content-Disposition": f"attachment; filename=white-christmas-{image_id}-social.jpg"},
     )
 
 

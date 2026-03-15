@@ -6,7 +6,13 @@ BUCKET_NAME = os.getenv("SUPABASE_PROTECTED_IMAGES_BUCKET", "protected-images")
 
 
 def get_storage_path(image_id: int) -> str:
+    """Clean scrambled image — no visible watermark, used by the extension to decode."""
     return f"{image_id}.jpg"
+
+
+def get_social_path(image_id: int) -> str:
+    """Social version — scrambled + visible watermark, for sharing on social media."""
+    return f"social/{image_id}.jpg"
 
 
 def upload_protected_image(storage_path: str, image_bytes: bytes) -> None:
@@ -18,6 +24,20 @@ def upload_protected_image(storage_path: str, image_bytes: bytes) -> None:
     )
 
 
+def upload_social_image(image_id: int, image_bytes: bytes) -> None:
+    db = get_service_client()
+    db.storage.from_(BUCKET_NAME).upload(
+        get_social_path(image_id),
+        image_bytes,
+        {"content-type": "image/jpeg", "upsert": "true"},
+    )
+
+
 def download_protected_image(storage_path: str) -> bytes:
     db = get_service_client()
     return db.storage.from_(BUCKET_NAME).download(storage_path)
+
+
+def download_social_image(image_id: int) -> bytes:
+    db = get_service_client()
+    return db.storage.from_(BUCKET_NAME).download(get_social_path(image_id))
