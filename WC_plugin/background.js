@@ -1,5 +1,5 @@
 const DEFAULT_SETTINGS = {
-  backendBaseUrl: "http://localhost:8000",
+  backendBaseUrl: "https://sxt8piagkk.ap-southeast-2.awsapprunner.com",
   accessToken: "",
   autoDecode: true,
   debug: false,
@@ -7,7 +7,13 @@ const DEFAULT_SETTINGS = {
 
 async function getSettings() {
   const settings = await chrome.storage.local.get(DEFAULT_SETTINGS);
-  return { ...DEFAULT_SETTINGS, ...settings };
+  const merged = { ...DEFAULT_SETTINGS, ...settings };
+  // Always override stale localhost URL
+  if (!merged.backendBaseUrl || merged.backendBaseUrl.includes("localhost")) {
+    merged.backendBaseUrl = DEFAULT_SETTINGS.backendBaseUrl;
+    chrome.storage.local.set({ backendBaseUrl: merged.backendBaseUrl });
+  }
+  return merged;
 }
 
 async function setSettings(patch) {
@@ -60,6 +66,10 @@ async function fetchBuffer(url, options = {}) {
 chrome.runtime.onInstalled.addListener(async (details) => {
   const existing = await chrome.storage.local.get(null);
   const merged = { ...DEFAULT_SETTINGS, ...existing };
+  // Migrate stale localhost URL to production
+  if (!merged.backendBaseUrl || merged.backendBaseUrl.includes("localhost")) {
+    merged.backendBaseUrl = DEFAULT_SETTINGS.backendBaseUrl;
+  }
   await chrome.storage.local.set(merged);
 
   // On fresh install, open the popup to prompt the user to sign in
