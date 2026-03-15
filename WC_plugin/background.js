@@ -57,10 +57,18 @@ async function fetchBuffer(url, options = {}) {
   };
 }
 
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async (details) => {
   const existing = await chrome.storage.local.get(null);
   const merged = { ...DEFAULT_SETTINGS, ...existing };
   await chrome.storage.local.set(merged);
+
+  // On fresh install, open the popup to prompt the user to sign in
+  if (details.reason === "install" && !existing.accessToken) {
+    chrome.action.openPopup().catch(() => {
+      // openPopup requires a focused window; fall back to opening as a tab
+      chrome.tabs.create({ url: chrome.runtime.getURL("popup.html") });
+    });
+  }
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

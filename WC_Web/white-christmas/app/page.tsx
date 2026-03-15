@@ -65,7 +65,7 @@ export default function Home() {
           <li><a href="#research">Research</a></li>
           <li><a href="#how">How it works</a></li>
           <li><Link href="/auth">Sign in</Link></li>
-          <li><Link href="/encode" className="nav-cta">Try demo</Link></li>
+          <li><Link href="/demo" className="nav-cta">Try demo</Link></li>
         </ul>
       </nav>
 
@@ -83,7 +83,7 @@ export default function Home() {
             Strangers see noise. The people you choose see you.
           </p>
           <div className={`hero-actions wc-anim-up ${heroLoaded ? 'on' : ''}`} style={{ transitionDelay: '620ms' }}>
-            <Link href="/encode" className="btn-primary">Try the demo</Link>
+            <Link href="/demo" className="btn-primary">Try the demo</Link>
             <a href="#how" className="btn-ghost">See how it works</a>
           </div>
         </div>
@@ -226,7 +226,7 @@ export default function Home() {
           <p>Upload a photo. Encrypt it. Let trusted viewers restore the original.</p>
         </div>
         <div className="hero-actions reveal-up" data-reveal>
-          <Link href="/encode" className="btn-primary">Try the demo</Link>
+          <Link href="/demo" className="btn-primary">Try the demo</Link>
           <a href="#research" className="btn-ghost">Read research</a>
         </div>
       </section>

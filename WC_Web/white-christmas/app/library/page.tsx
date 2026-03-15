@@ -52,6 +52,8 @@ export default function LibraryPage() {
 
   const [friendEmail, setFriendEmail] = useState('')
   const [friendStatus, setFriendStatus] = useState('')
+  const [pluginPairCode, setPluginPairCode] = useState('')
+  const [pluginPairStatus, setPluginPairStatus] = useState('')
   const [refreshTick, setRefreshTick] = useState(0)
   const [showNotifications, setShowNotifications] = useState(false)
 
@@ -170,6 +172,29 @@ export default function LibraryPage() {
 
   function refreshData() {
     setRefreshTick((x) => x + 1)
+  }
+
+  async function createPluginPairCode() {
+    if (!accessToken) {
+      setPluginPairStatus('Please sign in first.')
+      return
+    }
+    setPluginPairStatus('Generating code...')
+    try {
+      const res = await fetch(`${BACKEND_BASE_URL}/api/plugin/link/start`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      const json = await res.json().catch(() => null)
+      if (!res.ok || !json?.code) {
+        setPluginPairStatus(json?.detail || 'Could not create plugin code.')
+        return
+      }
+      setPluginPairCode(String(json.code))
+      setPluginPairStatus(`Code expires in ${json.expires_in || 120}s.`)
+    } catch {
+      setPluginPairStatus('Could not reach backend.')
+    }
   }
 
   async function sendFriendRequest() {
@@ -382,24 +407,37 @@ export default function LibraryPage() {
                     <Link href="/auth" className="btn-primary">Sign in →</Link>
                   </div>
                 ) : (
-                  <div className="library-profile-grid">
-                    <div className="library-stat">
-                      <span className="library-stat-k">Email</span>
-                      <span className="library-stat-v">{email || 'Unknown'}</span>
+                  <>
+                    <div className="library-profile-grid">
+                      <div className="library-stat">
+                        <span className="library-stat-k">Email</span>
+                        <span className="library-stat-v">{email || 'Unknown'}</span>
+                      </div>
+                      <div className="library-stat">
+                        <span className="library-stat-k">My Images</span>
+                        <span className="library-stat-v">{images.length}</span>
+                      </div>
+                      <div className="library-stat">
+                        <span className="library-stat-k">Shared To Me</span>
+                        <span className="library-stat-v">{sharedImages.length}</span>
+                      </div>
+                      <div className="library-stat">
+                        <span className="library-stat-k">Friends</span>
+                        <span className="library-stat-v">{friends.filter(f => f.status === 'accepted').length}</span>
+                      </div>
                     </div>
-                    <div className="library-stat">
-                      <span className="library-stat-k">My Images</span>
-                      <span className="library-stat-v">{images.length}</span>
+                    <div className="library-friend-form" style={{ marginTop: '1rem' }}>
+                      <button className="btn-primary" onClick={createPluginPairCode}>
+                        Connect plugin →
+                      </button>
+                      {pluginPairCode && (
+                        <p className="library-panel-note">
+                          Pair code: <strong>{pluginPairCode}</strong>
+                        </p>
+                      )}
+                      {pluginPairStatus && <p className="library-panel-note">{pluginPairStatus}</p>}
                     </div>
-                    <div className="library-stat">
-                      <span className="library-stat-k">Shared To Me</span>
-                      <span className="library-stat-v">{sharedImages.length}</span>
-                    </div>
-                    <div className="library-stat">
-                      <span className="library-stat-k">Friends</span>
-                      <span className="library-stat-v">{friends.filter(f => f.status === 'accepted').length}</span>
-                    </div>
-                  </div>
+                  </>
                 )}
               </div>
             )}

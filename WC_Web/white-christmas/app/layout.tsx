@@ -28,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${syne.variable} ${dmMono.variable}`}>
-      <body>
+      <body suppressHydrationWarning>
         <Snow />
         {children}
       </body>

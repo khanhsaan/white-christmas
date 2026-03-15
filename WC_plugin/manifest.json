@@ -1,18 +1,30 @@
 {
   "manifest_version": 3,
-  "name": "Protected Image Unscrambler (Demo)",
+  "name": "White Christmas",
   "version": "0.1",
-  "description": "Decodes block-scrambled protected images with suffix _protected.jpg.",
+  "description": "Decode White Christmas protected images — only trusted eyes see clearly.",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
   "host_permissions": [
     "<all_urls>"
   ],
   "permissions": [
     "storage",
+    "tabs",
     "declarativeNetRequest",
     "declarativeNetRequestWithHostAccess"
   ],
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    },
+    "default_title": "White Christmas"
   },
   "background": {
     "service_worker": "background.js"

@@ -1,10 +1,12 @@
 import io
 import logging
+import secrets
+import time
 
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv
 import os
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -35,7 +37,7 @@ from services.storage_repo import (
     upload_protected_image,
     upload_social_image,
 )
-from services.supabase_client import get_auth_client
+from services.supabase_client import get_auth_client, get_service_client
 
 dotenv_path = os.path.join(os.path.dirname(__file__), ".env.local")
 if os.path.exists(dotenv_path):
@@ -80,6 +82,44 @@ class AuthRequest(BaseModel):
     password: str
 
 
+class PluginLinkExchangeBody(BaseModel):
+    code: str
+
+
+PLUGIN_LINK_TTL_SECONDS = 120
+PLUGIN_LINK_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+_plugin_link_codes: dict[str, dict[str, str | float]] = {}
+
+
+def _cleanup_plugin_link_codes() -> None:
+    now = time.time()
+    expired = [code for code, row in _plugin_link_codes.items() if float(row.get("expires_at", 0)) <= now]
+    for code in expired:
+        _plugin_link_codes.pop(code, None)
+
+
+def _issue_plugin_link_code(user_id: str, access_token: str) -> tuple[str, int]:
+    _cleanup_plugin_link_codes()
+    code = "".join(secrets.choice(PLUGIN_LINK_ALPHABET) for _ in range(8))
+    expires_at = time.time() + PLUGIN_LINK_TTL_SECONDS
+    _plugin_link_codes[code] = {
+        "user_id": user_id,
+        "access_token": access_token,
+        "expires_at": expires_at,
+    }
+    return code, int(expires_at)
+
+
+def _consume_plugin_link_code(code: str) -> dict[str, str | float] | None:
+    _cleanup_plugin_link_codes()
+    row = _plugin_link_codes.pop(code, None)
+    if not row:
+        return None
+    if float(row.get("expires_at", 0)) <= time.time():
+        return None
+    return row
+
+
 @app.post("/api/auth/signup")
 def signup(body: AuthRequest):
     """Create a new account and pre-provision cryptographic key material."""
@@ -120,6 +160,71 @@ def login(body: AuthRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=401, detail=str(e))
+
+
+@app.get("/api/me")
+async def get_me(user=Depends(get_current_user)):
+    """Return the current user's email and profile name."""
+    db = get_service_client()
+    result = (
+        db.table("profiles")
+        .select("first_name, last_name")
+        .eq("id", str(user.id))
+        .limit(1)
+        .execute()
+    )
+    first_name, last_name = "", ""
+    if result.data:
+        first_name = (result.data[0].get("first_name") or "").strip()
+        last_name = (result.data[0].get("last_name") or "").strip()
+    return {
+        "user_id": str(user.id),
+        "email": user.email,
+        "first_name": first_name,
+        "last_name": last_name,
+    }
+
+
+@app.post("/api/plugin/link/start")
+async def start_plugin_link(request: Request, user=Depends(get_current_user)):
+    """
+    Create a one-time short-lived code that allows the plugin to import
+    the caller's current access token without typing it manually.
+    """
+    auth_header = request.headers.get("authorization", "")
+    if not auth_header.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+    access_token = auth_header.split(" ", 1)[1].strip()
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+
+    code, expires_at = _issue_plugin_link_code(str(user.id), access_token)
+    return {
+        "code": code,
+        "expires_in": PLUGIN_LINK_TTL_SECONDS,
+        "expires_at": expires_at,
+    }
+
+
+@app.post("/api/plugin/link/exchange")
+async def exchange_plugin_link(body: PluginLinkExchangeBody):
+    """
+    Exchange a one-time code for an access token.
+    Code is consumed immediately and cannot be reused.
+    """
+    normalized = "".join(ch for ch in (body.code or "").upper() if ch.isalnum())
+    if not normalized:
+        raise HTTPException(status_code=400, detail="Code is required")
+
+    row = _consume_plugin_link_code(normalized)
+    if not row:
+        raise HTTPException(status_code=400, detail="Invalid or expired code")
+
+    return {
+        "access_token": row["access_token"],
+        "user_id": row["user_id"],
+        "token_type": "bearer",
+    }
 
 
 # ============================================================

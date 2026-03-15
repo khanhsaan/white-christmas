@@ -15,164 +15,216 @@
         --ink-soft: #242424;
         --btn: #111111;
         --btn-text: #f8f8f8;
+        --ok: #2d9e6b;
+        --ok-bg: rgba(45, 158, 107, 0.07);
+        --ok-line: rgba(45, 158, 107, 0.2);
+        --err: #c0392b;
       }
 
-      * {
-        box-sizing: border-box;
-      }
+      * { box-sizing: border-box; }
 
       body {
         margin: 0;
-        width: 380px;
-        min-height: 560px;
+        width: 360px;
         background:
-          linear-gradient(155deg, rgba(0, 0, 0, 0.02) 0%, transparent 36%),
-          repeating-linear-gradient(
-            90deg,
-            rgba(0, 0, 0, 0.02) 0,
-            rgba(0, 0, 0, 0.02) 1px,
-            transparent 1px,
-            transparent 8px
-          ),
+          linear-gradient(155deg, rgba(0,0,0,0.02) 0%, transparent 36%),
+          repeating-linear-gradient(90deg, rgba(0,0,0,0.02) 0, rgba(0,0,0,0.02) 1px, transparent 1px, transparent 8px),
           var(--bg);
         color: var(--text);
         font: 13px/1.55 "Syne", "Avenir Next", "Helvetica Neue", Helvetica, Arial, sans-serif;
         -webkit-font-smoothing: antialiased;
       }
 
-      .wrap {
-        padding: 16px;
-      }
+      .wrap { padding: 16px; }
 
+      /* ── Header ── */
       .topbar {
         display: flex;
         align-items: baseline;
         justify-content: space-between;
         border-bottom: 1px solid var(--line);
-        padding-bottom: 12px;
-        margin-bottom: 12px;
+        padding-bottom: 11px;
+        margin-bottom: 16px;
       }
-
       .brand {
-        font-family: "Syne", "Avenir Next", "Helvetica Neue", Helvetica, Arial, sans-serif;
         font-weight: 800;
         letter-spacing: 0.08em;
         text-transform: uppercase;
         font-size: 12px;
       }
-
       .brand-sub {
         color: var(--muted);
-        font-family: "DM Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
+        font-family: "DM Mono", "SF Mono", Menlo, monospace;
         letter-spacing: 0.12em;
         font-size: 10px;
         text-transform: uppercase;
       }
 
-      .sub {
-        margin: 0 0 14px;
+      /* ── Logged-in card ── */
+      .session-card {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        background: var(--ok-bg);
+        border: 1px solid var(--ok-line);
+        padding: 14px;
+        margin-bottom: 16px;
+      }
+      .session-dot {
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        background: var(--ok);
+        flex-shrink: 0;
+        margin-top: 4px;
+      }
+      .session-name {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--ink);
+        margin-bottom: 2px;
+      }
+      .session-email {
+        font-family: "DM Mono", "SF Mono", Menlo, monospace;
+        font-size: 10px;
         color: var(--muted);
-        font-size: 11px;
-        font-family: "DM Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
-        letter-spacing: 0.04em;
+        word-break: break-all;
+        margin-bottom: 3px;
+      }
+      .session-label {
+        font-family: "DM Mono", "SF Mono", Menlo, monospace;
+        font-size: 10px;
+        color: var(--ok);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
       }
 
+      /* ── Auth prompt ── */
+      .auth-prompt {
+        margin-bottom: 16px;
+      }
+      .auth-prompt-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--ink);
+        margin-bottom: 4px;
+      }
+      .auth-prompt-sub {
+        font-size: 11px;
+        color: var(--muted);
+        font-family: "DM Mono", "SF Mono", Menlo, monospace;
+      }
+
+      /* ── Card ── */
       .card {
         background: linear-gradient(180deg, #fff, var(--panel));
         border: 1px solid var(--line);
-        border-radius: 0;
-        box-shadow: 0 16px 28px rgba(17, 17, 17, 0.06);
+        box-shadow: 0 8px 20px rgba(17,17,17,0.05);
         padding: 14px;
+        margin-bottom: 10px;
       }
 
-      label {
-        display: block;
-        margin-bottom: 11px;
+      .section-label {
+        font-family: "DM Mono", "SF Mono", Menlo, monospace;
+        font-size: 9px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 10px;
       }
+
+      /* ── Fields ── */
+      .field { margin-bottom: 10px; }
+      .field:last-child { margin-bottom: 0; }
 
       .label {
         display: block;
-        margin-bottom: 6px;
+        margin-bottom: 5px;
         color: var(--muted);
         font-size: 10px;
         letter-spacing: 0.14em;
         text-transform: uppercase;
-        font-family: "DM Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
+        font-family: "DM Mono", "SF Mono", Menlo, monospace;
       }
 
-      input[type="text"], textarea {
-        width: 100%;
-        border: 1px solid #cbcbcb;
-        background: #fff;
-        color: var(--ink);
-        border-radius: 0;
-        padding: 9px 10px;
-        outline: none;
-        transition: border-color 0.15s, box-shadow 0.15s;
-      }
-
+      input[type="text"],
       input[type="password"] {
         width: 100%;
         border: 1px solid #cbcbcb;
         background: #fff;
         color: var(--ink);
-        border-radius: 0;
-        padding: 9px 10px;
+        padding: 8px 10px;
+        font-size: 12px;
+        font-family: inherit;
         outline: none;
         transition: border-color 0.15s, box-shadow 0.15s;
       }
-
-      input[type="text"]:focus, input[type="password"]:focus, textarea:focus {
+      input[type="text"]:focus,
+      input[type="password"]:focus {
         border-color: #111;
         box-shadow: 0 0 0 1px #111 inset;
       }
 
-      textarea {
-        min-height: 64px;
-        resize: vertical;
-        font-family: "DM Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
-        font-size: 12px;
+      /* ── Or divider ── */
+      .or-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 12px 0;
+        color: var(--muted);
+        font-size: 10px;
+        font-family: "DM Mono", "SF Mono", Menlo, monospace;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+      .or-row::before,
+      .or-row::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: var(--line);
       }
 
+      /* ── Advanced toggle ── */
+      details { margin-top: 10px; }
+      summary {
+        cursor: pointer;
+        font-family: "DM Mono", "SF Mono", Menlo, monospace;
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+        list-style: none;
+        user-select: none;
+      }
+      summary::-webkit-details-marker { display: none; }
+      summary::before {
+        content: '+ ';
+      }
+      details[open] summary::before {
+        content: '− ';
+      }
+      .advanced-inner {
+        margin-top: 10px;
+      }
+
+      /* ── Row (checkbox + label) ── */
       .row {
         display: flex;
         align-items: center;
-        gap: 10px;
-        margin: 8px 0 14px;
+        gap: 8px;
+        margin-bottom: 12px;
       }
-
-      .row label {
-        margin: 0;
-        color: var(--ink-soft);
+      .row span {
         font-size: 12px;
+        color: var(--ink-soft);
       }
 
-      .hint {
-        color: var(--muted);
-        margin: 0;
-        font-size: 11px;
-        font-family: "DM Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
-      }
-
-      .actions {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-top: 13px;
-      }
-
-      .actions-left {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-
+      /* ── Buttons ── */
       button {
         border: 1px solid var(--ink);
-        border-radius: 0;
-        padding: 8px 12px;
+        padding: 8px 14px;
         cursor: pointer;
-        font-family: "DM Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
+        font-family: "DM Mono", "SF Mono", Menlo, monospace;
         letter-spacing: 0.08em;
         text-transform: uppercase;
         font-size: 10px;
@@ -180,83 +232,156 @@
         color: var(--btn-text);
         transition: transform 0.06s, opacity 0.15s;
       }
+      button:hover { opacity: 0.88; }
+      button:active { transform: translateY(1px); }
+      button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
-      button:hover {
-        opacity: 0.88;
-      }
-
-      button:active {
-        transform: translateY(1px);
-      }
-
-      #saveBtn {
+      .btn-ghost {
         background: #fff;
         color: var(--ink);
       }
+      .btn-danger {
+        background: #fff;
+        color: var(--err);
+        border-color: rgba(192,57,43,0.3);
+      }
+      .btn-danger:hover { background: var(--err); color: #fff; opacity: 1; }
+
+      /* ── Footer actions ── */
+      .actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid var(--line);
+        gap: 8px;
+      }
+      .actions-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
 
       #status {
-        color: var(--ink-soft);
-        font-size: 11px;
-        max-width: 130px;
+        font-family: "DM Mono", "SF Mono", Menlo, monospace;
+        font-size: 10px;
+        color: var(--muted);
         text-align: right;
-        font-family: "DM Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
+        max-width: 120px;
+        flex-shrink: 0;
       }
+      #status.ok  { color: var(--ok); }
+      #status.err { color: var(--err); }
 
-      .divider {
-        border: 0;
-        border-top: 1px solid var(--line);
-        margin: 11px 0 13px;
-      }
+      /* ── Views ── */
+      #view-loggedin { display: none; }
+      #view-loggedin.active { display: block; }
+      #view-auth.hidden { display: none; }
     </style>
   </head>
   <body>
     <div class="wrap">
+
+      <!-- Header -->
       <div class="topbar">
         <div class="brand">White Christmas</div>
         <div class="brand-sub">Viewer Plugin</div>
       </div>
-      <p class="sub">Configure API access for automatic authorized decode.</p>
 
-      <div class="card">
-        <label>
-          <span class="label">Backend Base URL</span>
-          <input id="backendBaseUrl" type="text" placeholder="http://localhost:8000" />
-        </label>
-
-        <label>
-          <span class="label">Access Token (Bearer)</span>
-          <textarea id="accessToken" placeholder="Paste your Supabase access token"></textarea>
-        </label>
-
-        <hr class="divider" />
-
-        <label>
-          <span class="label">Email</span>
-          <input id="email" type="text" placeholder="you@example.com" />
-        </label>
-
-        <label>
-          <span class="label">Password</span>
-          <input id="password" type="password" placeholder="Your password" />
-        </label>
-
-        <div class="row">
-          <input id="autoDecode" type="checkbox" />
-          <label for="autoDecode">Enable auto decode</label>
+      <!-- ── LOGGED IN VIEW ── -->
+      <div id="view-loggedin">
+        <div class="session-card">
+          <div class="session-dot"></div>
+          <div>
+            <div class="session-name" id="sessionName">–</div>
+            <div class="session-email" id="sessionEmail"></div>
+            <div class="session-label">Active session</div>
+          </div>
         </div>
 
-        <p class="hint">Use a logged-in user token that has decode permission from the image owner.</p>
+        <div class="card">
+          <div class="row">
+            <input id="autoDecode" type="checkbox" />
+            <span>Auto-decode protected images</span>
+          </div>
+          <button class="btn-danger" id="signOutBtn" style="width:100%">Sign out</button>
+        </div>
+
+        <details>
+          <summary>Advanced</summary>
+          <div class="advanced-inner card">
+            <div class="field">
+              <span class="label">Backend URL</span>
+              <input id="backendBaseUrl" type="text" placeholder="https://sxt8piagkk.ap-southeast-2.awsapprunner.com" />
+            </div>
+            <div style="margin-top:10px">
+              <button id="saveBtn" class="btn-ghost">Save URL</button>
+            </div>
+          </div>
+        </details>
+
+      </div>
+
+      <!-- ── LOGGED OUT VIEW ── -->
+      <div id="view-auth">
+        <div class="auth-prompt">
+          <div class="auth-prompt-title">Sign in to get started</div>
+          <div class="auth-prompt-sub">Protected images will decode automatically once you're signed in.</div>
+        </div>
+
+        <!-- Pair code (primary) -->
+        <div class="card">
+          <div class="section-label">Pair with website</div>
+          <div class="field">
+            <span class="label">Pair Code</span>
+            <input id="pairCode" type="text" placeholder="Get code from whitechristmas.app" />
+          </div>
+          <div style="margin-top:10px">
+            <button id="pairBtn" style="width:100%">Pair →</button>
+          </div>
+        </div>
+
+        <div class="or-row">or sign in manually</div>
+
+        <!-- Email + password (secondary) -->
+        <div class="card">
+          <div class="section-label">Email &amp; password</div>
+          <div class="field">
+            <span class="label">Email</span>
+            <input id="email" type="text" placeholder="you@example.com" autocomplete="off" />
+          </div>
+          <div class="field">
+            <span class="label">Password</span>
+            <input id="password" type="password" placeholder="••••••••" autocomplete="off" />
+          </div>
+        </div>
+
+        <details>
+          <summary>Advanced</summary>
+          <div class="advanced-inner card">
+            <div class="field">
+              <span class="label">Backend URL</span>
+              <input id="backendBaseUrlAuth" type="text" placeholder="https://sxt8piagkk.ap-southeast-2.awsapprunner.com" />
+            </div>
+          </div>
+        </details>
 
         <div class="actions">
           <div class="actions-left">
             <button id="signInBtn">Sign In</button>
-            <button id="saveBtn">Save Settings</button>
+            <button id="saveBtn2" class="btn-ghost">Save</button>
           </div>
-          <span id="status"></span>
         </div>
       </div>
-    </div>
 
+      <!-- Shared status -->
+      <div style="text-align:right; margin-top:10px; min-height:16px">
+        <span id="status"></span>
+      </div>
+
+    </div>
     <script src="popup.js"></script>
   </body>
-  </html>
+</html>

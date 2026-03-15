@@ -2558,3 +2558,519 @@ footer div {
     grid-template-columns: 1fr;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   DEMO PAGE
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Sticky step tracker ── */
+.demo-tracker {
+  position: sticky;
+  top: 72px;
+  z-index: 100;
+  display: flex;
+  gap: 0;
+  background: rgba(250,250,250,0.96);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--mid);
+  overflow-x: auto;
+}
+
+.demo-track-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1.6rem;
+  border-right: 1px solid var(--mid);
+  flex: 1;
+  min-width: 0;
+  opacity: 0.35;
+  transition: opacity 0.3s;
+}
+
+.demo-track-item.active {
+  opacity: 1;
+}
+
+.demo-track-num {
+  font-family: var(--font-dm-mono), 'DM Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+}
+
+.demo-track-label {
+  font-family: var(--font-dm-mono), 'DM Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--black);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Page layout ── */
+.demo-main {
+  padding-top: 0;
+}
+
+/* ── Each step section ── */
+.demo-step {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 92vh;
+  border-bottom: 1px solid var(--mid);
+  scroll-margin-top: 108px;
+}
+
+.demo-step-alt {
+  background: var(--faint);
+}
+
+.demo-step-last {
+  border-bottom: none;
+}
+
+.demo-step-hidden {
+  opacity: 0.18;
+  pointer-events: none;
+  filter: blur(1px);
+  transition: opacity 0.5s, filter 0.5s;
+}
+
+.demo-step-visible {
+  opacity: 1;
+  pointer-events: auto;
+  filter: none;
+}
+
+/* ── Step left column ── */
+.demo-step-inner {
+  padding: 6rem 3.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-right: 1px solid var(--mid);
+}
+
+.demo-h2 {
+  font-family: var(--font-syne), 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: clamp(2.2rem, 3.5vw, 3.4rem);
+  line-height: 1.06;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  margin-bottom: 1.6rem;
+}
+
+.demo-h2 em {
+  font-style: normal;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: -0.01em;
+  text-transform: none;
+}
+
+.demo-sub {
+  font-family: var(--font-dm-mono), 'DM Mono', monospace;
+  font-size: 0.78rem;
+  line-height: 1.9;
+  color: var(--muted);
+  max-width: 46ch;
+  margin-bottom: 2.8rem;
+  font-weight: 300;
+}
+
+.demo-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.8rem;
+  flex-wrap: wrap;
+}
+
+.demo-advance-btn {
+  font-family: var(--font-dm-mono), 'DM Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--mid);
+  padding-bottom: 2px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.demo-advance-btn:hover {
+  color: var(--black);
+  border-color: var(--black);
+}
+
+/* ── Install steps ── */
+.demo-install-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+  margin-bottom: 2.8rem;
+}
+
+.demo-install-row {
+  display: flex;
+  gap: 1.2rem;
+  align-items: flex-start;
+}
+
+.demo-install-num {
+  font-family: var(--font-dm-mono), 'DM Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  background: var(--mid);
+  width: 1.6rem;
+  height: 1.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+.demo-install-row strong {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+  font-family: var(--font-syne), 'Syne', sans-serif;
+  letter-spacing: -0.01em;
+}
+
+.demo-install-row p {
+  font-family: var(--font-dm-mono), 'DM Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.demo-install-row code {
+  font-family: var(--font-dm-mono), 'DM Mono', monospace;
+  font-size: 0.7rem;
+  background: var(--mid);
+  padding: 0.1rem 0.4rem;
+}
+
+.demo-install-row em {
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* ── Step right aside ── */
+.demo-aside {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 3rem;
+}
+
+.demo-aside-caption {
+  font-family: var(--font-dm-mono), 'DM Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 1.2rem;
+  text-align: center;
+}
+
+/* ── Plugin mockup ── */
+.demo-plugin-card {
+  width: 280px;
+  background: #fafafa;
+  border: 1px solid #e3e3e3;
+  box-shadow: 0 24px 48px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.06);
+  font-family: var(--font-dm-mono), 'DM Mono', monospace;
+}
+
+.demo-plugin-topbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 11px 14px;
+  border-bottom: 1px solid #e3e3e3;
+}
+
+.demo-plugin-brand {
+  font-weight: 800;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-family: var(--font-syne), 'Syne', sans-serif;
+}
+
+.demo-plugin-badge {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #888;
+}
+
+.demo-plugin-body {
+  padding: 14px;
+}
+
+.demo-plugin-prompt {
+  margin-bottom: 14px;
+}
+
+.demo-plugin-prompt-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #111;
+  margin-bottom: 4px;
+  font-family: var(--font-syne), 'Syne', sans-serif;
+}
+
+.demo-plugin-prompt-sub {
+  font-size: 10px;
+  color: #888;
+  line-height: 1.55;
+}
+
+.demo-plugin-field-block {
+  margin-bottom: 10px;
+}
+
+.demo-plugin-label {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #888;
+  margin-bottom: 5px;
+}
+
+.demo-plugin-input {
+  border: 1px solid #cbcbcb;
+  background: #fff;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: #bbb;
+}
+
+.demo-plugin-or {
+  font-size: 9px;
+  color: #bbb;
+  text-align: center;
+  letter-spacing: 0.08em;
+  margin: 10px 0;
+}
+
+/* ── Feature list (step 02) ── */
+.demo-feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  max-width: 340px;
+}
+
+.demo-feature-row {
+  display: flex;
+  gap: 1.2rem;
+  align-items: flex-start;
+}
+
+.demo-feature-icon {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.demo-feature-row strong {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+  font-family: var(--font-syne), 'Syne', sans-serif;
+  letter-spacing: -0.01em;
+}
+
+.demo-feature-row p {
+  font-family: var(--font-dm-mono), 'DM Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+/* ── Before/after (step 03) ── */
+.demo-before-after {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.demo-ba-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.demo-ba-img {
+  width: 130px;
+  height: 130px;
+  border: 1px solid var(--mid);
+}
+
+.demo-ba-noise {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  overflow: hidden;
+}
+
+.demo-ba-pixel {
+  width: 100%;
+  height: 100%;
+}
+
+.demo-ba-clear {
+  background: var(--faint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.demo-ba-face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.demo-ba-head {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #ddd;
+}
+
+.demo-ba-eyes {
+  display: flex;
+  gap: 14px;
+  margin-top: -44px;
+}
+
+.demo-ba-eyes span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--black);
+  margin-top: 16px;
+}
+
+.demo-ba-mouth {
+  width: 20px;
+  height: 8px;
+  border-bottom: 2px solid var(--black);
+  border-radius: 0 0 10px 10px;
+  margin-top: -28px;
+}
+
+.demo-ba-label {
+  font-family: var(--font-dm-mono), 'DM Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: center;
+}
+
+.demo-ba-arrow {
+  font-size: 1.4rem;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+/* ── Magic steps (step 04) ── */
+.demo-magic-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  margin-bottom: 0;
+}
+
+.demo-magic-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.demo-magic-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--black);
+  flex-shrink: 0;
+  margin-top: 0.45rem;
+}
+
+.demo-magic-row p {
+  font-family: var(--font-dm-mono), 'DM Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+.demo-magic-row strong {
+  color: var(--black);
+}
+
+/* ── Flow diagram (step 04) ── */
+.demo-flow-diagram {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.demo-flow-node {
+  width: 220px;
+  padding: 1rem 1.4rem;
+  border: 1px solid var(--mid);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+}
+
+.demo-flow-node span {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+
+.demo-flow-node p {
+  font-family: var(--font-dm-mono), 'DM Mono', monospace;
+  font-size: 0.68rem;
+  line-height: 1.55;
+  color: var(--black);
+}
+
+.demo-flow-arrow {
+  font-family: var(--font-dm-mono), 'DM Mono', monospace;
+  font-size: 1rem;
+  color: var(--muted);
+  padding: 0.4rem 0;
+}
+
+.demo-flow-reveal {
+  background: #0d0d0d;
+}
+
+.demo-flow-reveal p {
+  color: var(--white);
+}
+
