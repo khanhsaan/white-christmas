@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from auth import get_current_user, get_optional_user
+from auth import get_current_user, get_current_user_flex, get_optional_user
 from scramble import decode_image, generate_subkey, key_to_seed, protect_image
 from services.image_repo import (
     accept_friend_request,
@@ -368,7 +368,7 @@ async def get_scrambled_image_file(
 @app.get("/api/images/{image_id}/social")
 async def get_social_image_file(
     image_id: int,
-    user=Depends(get_current_user),
+    user=Depends(get_current_user_flex),
 ):
     """
     Return the social version of the image (scrambled + visible watermark).

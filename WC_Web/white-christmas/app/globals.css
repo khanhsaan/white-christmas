@@ -1498,7 +1498,7 @@ footer div {
   border: none;
   border-bottom: 1px solid #1a1a1a;
   background: transparent;
-  color: #666;
+  color: #888;
   width: 100%;
   padding: 1.1rem 1.2rem;
   display: flex;
@@ -1507,9 +1507,10 @@ footer div {
   gap: 0.75rem;
   cursor: pointer;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   font-family: var(--font-dm-mono), 'DM Mono', monospace;
   font-size: 0.62rem;
+  font-weight: 400;
   text-align: left;
   transition: color 0.15s, background 0.15s;
 }
@@ -1551,17 +1552,20 @@ footer div {
 
 .library-panel-label {
   font-family: var(--font-dm-mono), 'DM Mono', monospace;
-  font-size: 0.56rem;
-  letter-spacing: 0.18em;
+  font-size: 0.58rem;
+  font-weight: 400;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: #777;
-  margin-bottom: 0.65rem;
+  color: #aaa;
+  margin-bottom: 0.5rem;
 }
 
 .library-panel-title {
   font-family: var(--font-syne), sans-serif;
-  font-size: 1.2rem;
-  letter-spacing: -0.01em;
+  font-weight: 700;
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+  color: #f0f0f0;
   margin-bottom: 1rem;
 }
 
@@ -1620,7 +1624,8 @@ footer div {
 .library-panel-note {
   font-family: var(--font-dm-mono), 'DM Mono', monospace;
   font-size: 0.7rem;
-  color: #8f8f8f;
+  font-weight: 300;
+  color: #777;
 }
 
 .library-section-head {

@@ -130,27 +130,13 @@ export default function LibraryPage() {
         }
 
         setPageState('loaded')
-        setImages(ownList.map(img => ({ ...img, blobUrl: null, status: 'loading' as const })))
+        // Own images: use direct URL with ?token= so the plugin can detect and decode them.
+        setImages(ownList.map(img => ({
+          ...img,
+          blobUrl: `${BACKEND_BASE_URL}/api/images/${img.image_id}/social?token=${token}`,
+          status: 'ready' as const,
+        })))
         setSharedImages(sharedList.map(img => ({ ...img, blobUrl: null, status: 'loading' as const })))
-
-        ownList.forEach(async ({ image_id }) => {
-          try {
-            const res = await fetch(`${BACKEND_BASE_URL}/api/images/${image_id}/social`, {
-              headers: { Authorization: `Bearer ${token}` },
-            })
-            if (cancelled) return
-            if (!res.ok) {
-              updateEntry(image_id, { status: 'error' })
-              return
-            }
-            const blob = await res.blob()
-            const url = URL.createObjectURL(blob)
-            blobUrls.push(url)
-            if (!cancelled) updateEntry(image_id, { blobUrl: url, status: 'ready' })
-          } catch {
-            if (!cancelled) updateEntry(image_id, { status: 'error' })
-          }
-        })
 
         sharedList.forEach(async ({ image_id }) => {
           try {
