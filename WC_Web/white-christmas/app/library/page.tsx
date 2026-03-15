@@ -24,6 +24,15 @@ type FriendConnection = {
   direction: 'incoming' | 'outgoing'
 }
 
+type AccessLog = {
+  image_id: number
+  viewer_id: string
+  viewer_email: string | null
+  viewer_name: string | null
+  relation: 'friend' | 'stranger'
+  accessed_at: string
+}
+
 const BACKEND_BASE_URL =
   process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? 'http://localhost:8000'
 
@@ -39,6 +48,7 @@ export default function LibraryPage() {
   const [images, setImages] = useState<ImageEntry[]>([])
   const [sharedImages, setSharedImages] = useState<ImageEntry[]>([])
   const [friends, setFriends] = useState<FriendConnection[]>([])
+  const [accessLogs, setAccessLogs] = useState<AccessLog[]>([])
 
   const [friendEmail, setFriendEmail] = useState('')
   const [friendStatus, setFriendStatus] = useState('')
@@ -70,6 +80,7 @@ export default function LibraryPage() {
         setImages([])
         setSharedImages([])
         setFriends([])
+        setAccessLogs([])
         setPageState('unauthed')
         return
       }
@@ -79,7 +90,7 @@ export default function LibraryPage() {
       setEmail(session.user?.email || '')
 
       try {
-        const [ownRes, sharedRes, friendsRes] = await Promise.all([
+        const [ownRes, sharedRes, friendsRes, accessRes] = await Promise.all([
           fetch(`${BACKEND_BASE_URL}/api/images`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
@@ -87,6 +98,9 @@ export default function LibraryPage() {
             headers: { Authorization: `Bearer ${token}` },
           }),
           fetch(`${BACKEND_BASE_URL}/api/friends`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${BACKEND_BASE_URL}/api/notifications/access`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ])
@@ -99,9 +113,11 @@ export default function LibraryPage() {
         const ownJson = await ownRes.json() as { images: Array<{ image_id: number; storage_path: string; created_at?: string }> }
         const sharedJson = await sharedRes.json() as { images: Array<{ image_id: number; owner_id: string; storage_path: string; created_at?: string }> }
         const friendsJson = await friendsRes.json() as { friends: FriendConnection[] }
+        const accessJson = accessRes.ok ? await accessRes.json() as { access_logs: AccessLog[] } : { access_logs: [] }
 
         if (cancelled) return
         setFriends(friendsJson.friends || [])
+        setAccessLogs(accessJson.access_logs || [])
 
         const ownList = ownJson.images || []
         const sharedList = sharedJson.images || []
@@ -268,6 +284,8 @@ export default function LibraryPage() {
   }
 
   const pendingRequests = friends.filter(f => f.direction === 'incoming' && f.status === 'pending')
+  const strangerAccess = accessLogs.filter(l => l.relation === 'stranger')
+  const totalNotifications = pendingRequests.length + strangerAccess.length
 
   return (
     <>
@@ -281,14 +299,14 @@ export default function LibraryPage() {
               <button
                 className="nav-notif-btn"
                 onClick={() => setShowNotifications(v => !v)}
-                aria-label={`Friend requests${pendingRequests.length > 0 ? ` (${pendingRequests.length})` : ''}`}
+                aria-label={`Notifications${totalNotifications > 0 ? ` (${totalNotifications})` : ''}`}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                   <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                 </svg>
-                {pendingRequests.length > 0 && (
-                  <span className="nav-notif-badge">{pendingRequests.length}</span>
+                {totalNotifications > 0 && (
+                  <span className="nav-notif-badge">{totalNotifications}</span>
                 )}
               </button>
 
@@ -317,6 +335,32 @@ export default function LibraryPage() {
                         </div>
                       </div>
                     ))
+                  )}
+
+                  <p className="nav-notif-heading" style={{ marginTop: '0.75rem' }}>Image Views</p>
+                  {accessLogs.length === 0 ? (
+                    <p className="nav-notif-empty">No one has decoded your images yet</p>
+                  ) : (
+                    accessLogs.map(log => {
+                      const label = log.relation === 'friend'
+                        ? `Friend · ${log.viewer_name || log.viewer_email || log.viewer_id}`
+                        : 'Stranger'
+                      return (
+                        <div key={`${log.image_id}-${log.viewer_id}`} className={`nav-notif-row nav-notif-row--${log.relation}`}>
+                          <div>
+                            <span className={`nav-notif-relation nav-notif-relation--${log.relation}`}>
+                              {log.relation === 'stranger' ? '⚠ Stranger' : '✓ Friend'}
+                            </span>
+                            <span className="nav-notif-email">
+                              {log.relation === 'friend'
+                                ? (log.viewer_name || log.viewer_email || log.viewer_id)
+                                : (log.viewer_email || log.viewer_id)}
+                            </span>
+                            <span className="nav-notif-meta">decoded image #{log.image_id}</span>
+                          </div>
+                        </div>
+                      )
+                    })
                   )}
                 </div>
               )}

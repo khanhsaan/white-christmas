@@ -461,3 +461,15 @@ async def decline_friend(
 @app.get("/api/friends")
 async def get_friends(user=Depends(get_current_user)):
     return {"friends": list_friendships(str(user.id))}
+
+
+# ============================================================
+# Notifications — who has decoded your images
+# ============================================================
+@app.get("/api/notifications/access")
+async def get_access_notifications(user=Depends(get_current_user)):
+    """
+    Return a deduplicated list of viewers who decoded the authenticated
+    user's images, labelled 'friend' or 'stranger'.
+    """
+    return {"access_logs": get_image_access_logs(str(user.id))}
