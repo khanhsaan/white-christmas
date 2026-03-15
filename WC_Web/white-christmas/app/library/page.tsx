@@ -135,7 +135,7 @@ export default function LibraryPage() {
 
         ownList.forEach(async ({ image_id }) => {
           try {
-            const res = await fetch(`${BACKEND_BASE_URL}/api/images/${image_id}/file`, {
+            const res = await fetch(`${BACKEND_BASE_URL}/api/images/${image_id}/social`, {
               headers: { Authorization: `Bearer ${token}` },
             })
             if (cancelled) return
@@ -342,9 +342,6 @@ export default function LibraryPage() {
                     <p className="nav-notif-empty">No one has decoded your images yet</p>
                   ) : (
                     accessLogs.map(log => {
-                      const label = log.relation === 'friend'
-                        ? `Friend · ${log.viewer_name || log.viewer_email || log.viewer_id}`
-                        : 'Stranger'
                       return (
                         <div key={`${log.image_id}-${log.viewer_id}`} className={`nav-notif-row nav-notif-row--${log.relation}`}>
                           <div>
@@ -531,7 +528,7 @@ export default function LibraryPage() {
                               disabled={entry.status !== 'ready'}
                               onClick={() => download(entry, 'protected')}
                             >
-                              ↓ Download
+                              ↓ Share
                             </button>
                           </div>
                         </div>
