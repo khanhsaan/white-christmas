@@ -15,6 +15,7 @@ from services.image_repo import (
     accept_friend_request,
     create_or_accept_friend_request,
     decline_friend_request,
+    get_image_access_logs,
     get_image_record,
     get_images_shared_with_user,
     get_or_create_user_key,
@@ -23,6 +24,7 @@ from services.image_repo import (
     get_user_images,
     grant_permission,
     has_permission,
+    log_image_access,
     save_image_metadata,
 )
 from services.storage_repo import (
@@ -257,6 +259,9 @@ async def decode(
     if viewer_id != owner_id and not has_permission(owner_id, viewer_id):
         raise HTTPException(status_code=403, detail="Access denied")
 
+    if viewer_id != owner_id:
+        log_image_access(image_id, owner_id, viewer_id)
+
     # Decrypt the image's subkey using the owner's master key
     master_key = get_or_create_user_key(owner_id)
     subkey = Fernet(master_key.encode()).decrypt(encrypted_subkey.encode()).decode()
@@ -308,6 +313,9 @@ async def get_image_key(
     # Owner always has access; others must be in permissions table
     if viewer_id != owner_id and not has_permission(owner_id, viewer_id):
         raise HTTPException(status_code=403, detail="Access denied")
+
+    if viewer_id != owner_id:
+        log_image_access(image_id, owner_id, viewer_id)
 
     master_key = get_or_create_user_key(owner_id)
     subkey = Fernet(master_key.encode()).decrypt(encrypted_subkey.encode()).decode()

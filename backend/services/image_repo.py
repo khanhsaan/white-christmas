@@ -242,6 +242,97 @@ def accept_friend_request(addressee_id: str, requester_id: str) -> bool:
     return True
 
 
+def log_image_access(image_id: int, owner_id: str, viewer_id: str) -> None:
+    """Record that viewer decoded / requested the key for owner's image."""
+    db = get_service_client()
+    db.table("image_access_logs").insert(
+        {"image_id": image_id, "owner_id": owner_id, "viewer_id": viewer_id}
+    ).execute()
+
+
+def get_image_access_logs(owner_id: str) -> list[dict]:
+    """
+    Return deduplicated access events for the owner's images (newest first).
+    Each entry includes whether the viewer is a friend or stranger.
+    """
+    db = get_service_client()
+    result = (
+        db.table("image_access_logs")
+        .select("image_id, viewer_id, accessed_at")
+        .eq("owner_id", owner_id)
+        .order("accessed_at", desc=True)
+        .execute()
+    )
+    logs = result.data or []
+
+    # Keep only the most recent access per (image_id, viewer_id)
+    seen: set[tuple] = set()
+    deduped = []
+    for row in logs:
+        key = (row.get("image_id"), row.get("viewer_id"))
+        if key not in seen:
+            seen.add(key)
+            deduped.append(row)
+
+    # Collect accepted friend IDs for the owner
+    friends_sent = (
+        db.table("friendships")
+        .select("addressee_id")
+        .eq("requester_id", owner_id)
+        .eq("status", "accepted")
+        .execute()
+    )
+    friends_recv = (
+        db.table("friendships")
+        .select("requester_id")
+        .eq("addressee_id", owner_id)
+        .eq("status", "accepted")
+        .execute()
+    )
+    friend_ids: set[str] = set()
+    for row in (friends_sent.data or []):
+        if row.get("addressee_id"):
+            friend_ids.add(row["addressee_id"])
+    for row in (friends_recv.data or []):
+        if row.get("requester_id"):
+            friend_ids.add(row["requester_id"])
+
+    out = []
+    for log in deduped:
+        viewer_id = log.get("viewer_id")
+        is_friend = viewer_id in friend_ids
+
+        viewer_name: Optional[str] = None
+        viewer_email: Optional[str] = None
+        if viewer_id:
+            profile_res = (
+                db.table("profiles")
+                .select("first_name, last_name")
+                .eq("user_id", viewer_id)
+                .limit(1)
+                .execute()
+            )
+            if profile_res.data:
+                p = profile_res.data[0]
+                first = (p.get("first_name") or "").strip()
+                last = (p.get("last_name") or "").strip()
+                full = f"{first} {last}".strip()
+                viewer_name = full if full else None
+            viewer_email = get_user_email_by_id(viewer_id)
+
+        out.append(
+            {
+                "image_id": log.get("image_id"),
+                "viewer_id": viewer_id,
+                "viewer_email": viewer_email,
+                "viewer_name": viewer_name,
+                "relation": "friend" if is_friend else "stranger",
+                "accessed_at": log.get("accessed_at"),
+            }
+        )
+    return out
+
+
 def list_friendships(user_id: str) -> list[dict]:
     db = get_service_client()
     sent = (
