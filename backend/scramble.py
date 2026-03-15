@@ -6,7 +6,9 @@ Ported from the white-christmas_template main.py.
 import cv2
 import numpy as np
 import hashlib
+import io
 from cryptography.fernet import Fernet
+from PIL import Image, UnidentifiedImageError
 from typing import Tuple
 
 PATCH_SIZE = 16
@@ -43,10 +45,20 @@ def key_to_seed(key: str) -> int:
 # Image loading
 # ============================================================
 def load_and_resize(image_bytes: bytes, size: int = 512) -> np.ndarray:
-    nparr = np.frombuffer(image_bytes, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    if img is None:
-        raise ValueError("Could not decode image")
+    """
+    Decode via Pillow first (safer for browser-sourced JPEG variants),
+    then convert to OpenCV BGR and resize.
+    """
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as pil_img:
+            pil_rgb = pil_img.convert("RGB")
+            rgb = np.array(pil_rgb)
+    except UnidentifiedImageError as exc:
+        raise ValueError("Could not decode image") from exc
+    except Exception as exc:
+        raise ValueError("Invalid image file") from exc
+
+    img = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
     img = cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA)
     return img
 

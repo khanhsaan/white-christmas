@@ -318,12 +318,20 @@ async def _encode_impl(
     # Anonymous: skip storage — ephemeral protection only.
     if user is not None:
         user_id = str(user.id)
-        master_key = get_or_create_user_key(user_id)
-        encrypted_subkey = Fernet(master_key.encode()).encrypt(subkey.encode()).decode()
-        storage_path = get_storage_path(image_id)
-        upload_protected_image(storage_path, clean_bytes)
-        upload_social_image(image_id, social_bytes)
-        save_image_metadata(image_id, user_id, encrypted_subkey, storage_path)
+        try:
+            master_key = get_or_create_user_key(user_id)
+            encrypted_subkey = Fernet(master_key.encode()).encrypt(subkey.encode()).decode()
+            storage_path = get_storage_path(image_id)
+            upload_protected_image(storage_path, clean_bytes)
+            upload_social_image(image_id, social_bytes)
+            save_image_metadata(image_id, user_id, encrypted_subkey, storage_path)
+        except Exception:
+            logger.exception(
+                "Failed to persist protected image. user_id=%s image_id=%s",
+                user_id,
+                image_id,
+            )
+            raise HTTPException(status_code=500, detail="Failed to persist protected image")
 
     output = social_bytes if version == "social" else clean_bytes
     filename = f"protected_{image_id}_{'social' if version == 'social' else 'clean'}.jpg"
