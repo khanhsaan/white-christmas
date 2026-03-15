@@ -31,7 +31,7 @@ export default function AuthPage() {
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault()
     const { error } = await signUp({ email: suEmail, password: suPassword })
-    if (!error) router.push('/auth/setup-profile')
+    if (!error) router.push('/library')
   }
 
   function switchTab(next: Tab) {
