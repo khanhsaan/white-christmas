@@ -750,6 +750,60 @@ footer div {
   margin-bottom: 0.5rem;
 }
 
+.auth-ratelimit {
+  background: rgba(255, 183, 77, 0.07);
+  border: 1px solid rgba(255, 183, 77, 0.3);
+  border-radius: 4px;
+  padding: 0.75rem 0.85rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8rem;
+  color: #ccc;
+}
+
+.auth-ratelimit-top {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+}
+
+.auth-ratelimit-top strong {
+  color: #ffb74d;
+  font-size: 0.82rem;
+}
+
+.auth-ratelimit-icon {
+  font-size: 0.9rem;
+}
+
+.auth-ratelimit p {
+  color: #888;
+  line-height: 1.5;
+  margin-bottom: 0.6rem;
+}
+
+.auth-ratelimit-bar {
+  height: 3px;
+  background: rgba(255, 183, 77, 0.15);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 0.35rem;
+}
+
+.auth-ratelimit-fill {
+  height: 100%;
+  background: #ffb74d;
+  border-radius: 2px;
+  transition: width 1s linear;
+}
+
+.auth-ratelimit-count {
+  font-family: var(--font-dm-mono), 'DM Mono', monospace;
+  font-size: 0.72rem;
+  color: #ffb74d;
+  letter-spacing: 0.05em;
+}
+
 /* Date input theming */
 .auth-input-date {
   color-scheme: dark;

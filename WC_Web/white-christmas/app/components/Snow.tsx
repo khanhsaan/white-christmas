@@ -11,26 +11,69 @@ interface Flake {
   opacity: number
   wobble: number
   wobbleSpeed: number
+  angle: number
 }
 
-export default function Snow() {
+function drawFlake(ctx: CanvasRenderingContext2D, f: Flake) {
+  if (f.r < 1.8) {
+    // tiny: plain circle
+    ctx.beginPath()
+    ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2)
+    ctx.fill()
+  } else {
+    // larger: 6-arm star
+    ctx.beginPath()
+    for (let i = 0; i < 6; i++) {
+      const a = f.angle + (i / 6) * Math.PI * 2
+      ctx.moveTo(f.x, f.y)
+      ctx.lineTo(f.x + Math.cos(a) * f.r * 2.4, f.y + Math.sin(a) * f.r * 2.4)
+      // tiny branches
+      const mid = f.r * 1.2
+      ctx.moveTo(f.x + Math.cos(a) * mid, f.y + Math.sin(a) * mid)
+      ctx.lineTo(
+        f.x + Math.cos(a + 0.5) * mid * 1.4,
+        f.y + Math.sin(a + 0.5) * mid * 1.4,
+      )
+    }
+    ctx.stroke()
+  }
+}
+
+interface SnowProps {
+  count?: number
+  color?: string
+  canvasOpacity?: number
+  maxOpacity?: number
+}
+
+export default function Snow({
+  count = 30,
+  color = '110, 135, 165',
+  canvasOpacity = 0.7,
+  maxOpacity = 0.63,
+}: SnowProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const sc = canvas.getContext('2d')!
+    const ctx = canvas.getContext('2d')!
 
-    const flakes: Flake[] = Array.from({ length: 160 }, (_, i) => ({
-      x: Math.random() * window.innerWidth,
-      y: Math.random() * window.innerHeight,
-      r: i < 110 ? 0.5 + Math.random() * 1.0 : 1.2 + Math.random() * 1.8,
-      speed: i < 110 ? 0.2 + Math.random() * 0.45 : 0.5 + Math.random() * 0.8,
-      drift: (Math.random() - 0.5) * 0.25,
-      opacity: i < 110 ? 0.06 + Math.random() * 0.18 : 0.1 + Math.random() * 0.22,
-      wobble: Math.random() * Math.PI * 2,
-      wobbleSpeed: 0.006 + Math.random() * 0.01,
-    }))
+    // Three depth layers for parallax feel
+    const flakes: Flake[] = Array.from({ length: count }, () => {
+      const layer = Math.random() // 0 = far/small, 1 = near/large
+      return {
+        x: Math.random() * window.innerWidth,
+        y: Math.random() * window.innerHeight,
+        r: layer * 2.8 + 0.4,
+        speed: layer * 1.4 + 0.3,
+        drift: (Math.random() - 0.5) * 0.4,
+        opacity: layer * (maxOpacity - 0.18) + 0.18,
+        wobble: Math.random() * Math.PI * 2,
+        wobbleSpeed: 0.005 + Math.random() * 0.012,
+        angle: Math.random() * Math.PI * 2,
+      }
+    })
 
     function resize() {
       canvas!.width = window.innerWidth
@@ -44,21 +87,25 @@ export default function Snow() {
     function draw() {
       const sw = canvas!.width
       const sh = canvas!.height
-      sc.clearRect(0, 0, sw, sh)
+      ctx.clearRect(0, 0, sw, sh)
 
       for (const f of flakes) {
-        sc.beginPath()
-        sc.arc(f.x, f.y, f.r, 0, Math.PI * 2)
-        sc.fillStyle = `rgba(190, 205, 218, ${f.opacity})`
-        sc.fill()
+        ctx.save()
+        ctx.globalAlpha = f.opacity
+        ctx.fillStyle = `rgba(${color}, 1)`
+        ctx.strokeStyle = `rgba(${color}, 1)`
+        ctx.lineWidth = 0.8
+        drawFlake(ctx, f)
+        ctx.restore()
 
         f.wobble += f.wobbleSpeed
-        f.x += Math.sin(f.wobble) * 0.35 + f.drift
+        f.angle += f.wobbleSpeed * 0.4
+        f.x += Math.sin(f.wobble) * 0.45 + f.drift
         f.y += f.speed
 
-        if (f.y > sh + 6) { f.y = -6; f.x = Math.random() * sw }
-        if (f.x > sw + 6) f.x = -6
-        if (f.x < -6) f.x = sw + 6
+        if (f.y > sh + 10) { f.y = -10; f.x = Math.random() * sw }
+        if (f.x > sw + 10) f.x = -10
+        if (f.x < -10) f.x = sw + 10
       }
 
       rafId = requestAnimationFrame(draw)
@@ -70,7 +117,7 @@ export default function Snow() {
       window.removeEventListener('resize', resize)
       cancelAnimationFrame(rafId)
     }
-  }, [])
+  }, [count, color, maxOpacity])
 
   return (
     <canvas
@@ -83,6 +130,7 @@ export default function Snow() {
         height: '100%',
         pointerEvents: 'none',
         zIndex: 5,
+        opacity: canvasOpacity,
       }}
     />
   )

@@ -1,17 +1,25 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 
 type Tab = 'signin' | 'signup'
 
+const RATE_LIMIT_SECONDS = 60
+
+function isRateLimitError(msg: string) {
+  return /rate.?limit/i.test(msg) || /security purposes/i.test(msg)
+}
+
 export default function AuthPage() {
   const router = useRouter()
   const { signIn, signUp, loading, error } = useAuth()
 
   const [tab, setTab] = useState<Tab>('signin')
+  const [rateLimitedAt, setRateLimitedAt] = useState<number | null>(null)
+  const [countdown, setCountdown] = useState(0)
 
   // ── Sign-in state ──────────────────────────────────────
   const [siEmail, setSiEmail]       = useState('')
@@ -21,16 +29,34 @@ export default function AuthPage() {
   const [suEmail, setSuEmail]       = useState('')
   const [suPassword, setSuPassword] = useState('')
 
+  // ── Countdown ticker ───────────────────────────────────
+  useEffect(() => {
+    if (!rateLimitedAt) return
+    setCountdown(RATE_LIMIT_SECONDS)
+    const id = window.setInterval(() => {
+      const elapsed = Math.floor((Date.now() - rateLimitedAt) / 1000)
+      const remaining = Math.max(0, RATE_LIMIT_SECONDS - elapsed)
+      setCountdown(remaining)
+      if (remaining <= 0) {
+        clearInterval(id)
+        setRateLimitedAt(null)
+      }
+    }, 1000)
+    return () => clearInterval(id)
+  }, [rateLimitedAt])
+
   // ── Handlers ───────────────────────────────────────────
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault()
     const { error } = await signIn({ email: siEmail, password: siPassword })
+    if (error && isRateLimitError(error.message)) { setRateLimitedAt(Date.now()); return }
     if (!error) router.push('/library')
   }
 
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault()
     const { error } = await signUp({ email: suEmail, password: suPassword })
+    if (error && isRateLimitError(error.message)) { setRateLimitedAt(Date.now()); return }
     if (!error) router.push('/library')
   }
 
@@ -114,8 +140,26 @@ export default function AuthPage() {
             </button>
           </div>
 
+          {/* Rate-limit banner */}
+          {rateLimitedAt && (
+            <div className="auth-ratelimit">
+              <div className="auth-ratelimit-top">
+                <span className="auth-ratelimit-icon">⏳</span>
+                <strong>Email rate limit reached</strong>
+              </div>
+              <p>Supabase free tier allows 2 emails per minute. Please wait before trying again.</p>
+              <div className="auth-ratelimit-bar">
+                <div
+                  className="auth-ratelimit-fill"
+                  style={{ width: `${(countdown / RATE_LIMIT_SECONDS) * 100}%` }}
+                />
+              </div>
+              <span className="auth-ratelimit-count">{countdown}s remaining</span>
+            </div>
+          )}
+
           {/* Shared error banner */}
-          {error && (
+          {error && !rateLimitedAt && (
             <p className="auth-error">{error}</p>
           )}
 

@@ -57,7 +57,7 @@ export default function Home() {
         <div className="cl-text">White<span>Christmas</span></div>
       </div>
 
-      <div className={`page-content ${heroLoaded ? 'loaded' : ''}`}>
+<div className={`page-content ${heroLoaded ? 'loaded' : ''}`}>
       <nav className={`wc-nav-intro ${navLoaded ? 'loaded' : ''}`}>
         <a className="logo" href="#">White Christmas</a>
         <ul>
