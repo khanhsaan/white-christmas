@@ -525,6 +525,23 @@ export default function LibraryPage() {
 
                 {pageState === 'loaded' && (
                   <>
+                    <div className="library-advisory">
+                      <div className="library-advisory-row">
+                        <span className="library-advisory-icon">🔌</span>
+                        <div>
+                          <strong>Images still scrambled?</strong>
+                          <p>You need the White Christmas plugin installed and signed in. <Link href="/demo">Get the plugin →</Link></p>
+                        </div>
+                      </div>
+                      <div className="library-advisory-row">
+                        <span className="library-advisory-icon">🔒</span>
+                        <div>
+                          <strong>Can&apos;t see a friend&apos;s image?</strong>
+                          <p>The image owner hasn&apos;t granted you access yet. Ask them to share it from their library.</p>
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="library-section-head">
                       <p className="library-panel-label">Owned</p>
                       <h3 className="library-panel-title">My Protected Images</h3>
