@@ -71,6 +71,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*", "X-Image-ID"],
     expose_headers=["X-Image-ID"],
+    max_age=60,
 )
 
 
@@ -296,6 +297,12 @@ async def _encode_impl(
         raise HTTPException(status_code=400, detail="version must be 'clean' or 'social'")
 
     image_bytes = await file.read()
+    max_upload_bytes = int(os.getenv("MAX_UPLOAD_BYTES", str(10 * 1024 * 1024)))
+    if len(image_bytes) > max_upload_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Image is too large. Max allowed size is {max_upload_bytes // (1024 * 1024)}MB.",
+        )
     subkey = generate_subkey()
 
     try:
