@@ -130,59 +130,33 @@ def get_images_shared_with_user(viewer_id: str) -> list[dict]:
 
 
 def get_user_id_by_email(email: str) -> Optional[str]:
-    """
-    Look up a user's UUID by email using Supabase Admin API.
-    Handles both object and dict response shapes.
-    """
-    db = get_service_client()
-    target = (email or "").strip().lower()
+    """Look up a user's UUID by email via a security-definer DB function."""
+    target = (email or "").strip()
     if not target:
         return None
-    response = db.auth.admin.list_users()
-    users = []
-
-    if isinstance(response, list):
-        users = response
-    elif hasattr(response, "users") and response.users is not None:
-        users = response.users
-    elif isinstance(response, dict):
-        users = response.get("users") or response.get("data", {}).get("users") or []
-
-    for user in users:
-        user_email = getattr(user, "email", None)
-        if user_email is None and isinstance(user, dict):
-            user_email = user.get("email")
-        if isinstance(user_email, str) and user_email.strip().lower() == target:
-            user_id = getattr(user, "id", None)
-            if user_id is None and isinstance(user, dict):
-                user_id = user.get("id")
-            return str(user_id) if user_id else None
-    return None
+    db = get_service_client()
+    result = db.rpc("get_user_id_by_email", {"p_email": target}).execute()
+    value = result.data
+    if not value:
+        return None
+    # RPC returns the scalar directly or wrapped in a list
+    if isinstance(value, list):
+        value = value[0] if value else None
+    return str(value) if value else None
 
 
 def get_user_email_by_id(user_id: str) -> Optional[str]:
+    """Look up a user's email by UUID via a security-definer DB function."""
+    if not user_id:
+        return None
     db = get_service_client()
-    response = db.auth.admin.list_users()
-    users = []
-
-    if isinstance(response, list):
-        users = response
-    elif hasattr(response, "users") and response.users is not None:
-        users = response.users
-    elif isinstance(response, dict):
-        users = response.get("users") or response.get("data", {}).get("users") or []
-
-    for user in users:
-        uid = getattr(user, "id", None)
-        if uid is None and isinstance(user, dict):
-            uid = user.get("id")
-        if str(uid) != user_id:
-            continue
-        email = getattr(user, "email", None)
-        if email is None and isinstance(user, dict):
-            email = user.get("email")
-        return str(email) if email else None
-    return None
+    result = db.rpc("get_user_email_by_id", {"p_user_id": user_id}).execute()
+    value = result.data
+    if not value:
+        return None
+    if isinstance(value, list):
+        value = value[0] if value else None
+    return str(value) if value else None
 
 
 def create_or_accept_friend_request(requester_id: str, addressee_id: str) -> dict:
